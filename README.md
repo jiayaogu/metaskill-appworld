@@ -1,132 +1,89 @@
-# ACE + AppWorld Experiments
+# Install a clean AppWorld environment for all baselines
 
-This repository provides the full setup and instructions for running AppWorld experiments and reproducing the reported metrics, including offline and online adaptation with ACE.
+This guide sets up a clean ACE AppWorld environment from source.
 
-> **⚠️ Important:**  
-> Do **NOT** install this repository using `pip install appworld`.  
-> This version includes custom modifications and must be installed **from source**.
-> This repo is a research preview; please use it with caution in high-stakes production environments.
+## Prerequisites
 
-## 1. Environment Setup
-
-Follow these steps exactly. Skipping steps may cause missing-file errors or silent failures. Setting up this repo and running basic experiments do not require GPU access. All you need is API access from providers like Together AI, SambaNova, or OpenAI.
-
-### 1.1 Install Git LFS
 ```bash
-git lfs install
-```
-
-### 1.2 Clone the repository
-```bash
+git lfs install # if not installed already
 git clone https://github.com/ace-agent/ace-appworld.git ace-appworld
 cd ace-appworld
+
 export APPWORLD_PROJECT_PATH="$(pwd)"
-```
 
-### 1.3 Create virtual env for Python3.11 
-Feel free to use other methods like conda if you wish
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-```
+python3.11 -m venv .venv-clean-appworld
+source .venv-clean-appworld/bin/activate
 
-### 1.4 Install AppWorld from source
-```bash
+python -m pip install --upgrade pip setuptools wheel
 pip install -e .
 pip install -e "experiments[simplified]"
-appworld install --repo
-```
 
-### 1.5 Fetch data
-```bash
+appworld install --repo # install AppWorld
 appworld download data
 ```
 
-## 2. Configure Experiment
+## Re-enter an Existing Environment
 
-### 2.1 Configure API Keys
-
-API providers are configured via the ```provider``` field in the experiment config files. The framework currently supports Together AI, SambaNova, and OpenAI. Before running experiments, make sure to export the corresponding API keys that you need:
 ```bash
-export TOGETHER_API_KEY=YOUR_API_KEY_HERE # export if necessary
-export SAMBANOVA_API_KEY=YOUR_API_KEY_HERE # export if necessary
-export OPENAI_API_KEY=YOUR_API_KEY_HERE # export if necessary
+cd /home/jiayao/Metaskill-library/baselines/ace/ace-appworld
+source .venv-clean-appworld/bin/activate
+export APPWORLD_PROJECT_PATH="$(pwd)"
 ```
 
-### 2.2 (Optional) Customize Configuration Files
+## Sanity Check
 
-Under ```experiments/configs```, you can customize the experiment you'd like to run by adding new or editing existing ```.jsonnet``` config files, including choice of language models and API providers, sampling parameters, system prompts, etc.
-
-As an example, the following config snippet specifies that the reflector agent should use DeepSeek-V3.1 as its language model, rely on the SambaNova API as the provider, and run with a sampling temperature of zero.
+```bash
+python -c "import click, typer; print('click', click.__version__); print('typer', typer.__version__)"
+appworld --help
 ```
-local reflector_model_config = {
-    "name": "DeepSeek-V3.1",
-    "provider": "sambanova",
+
+Expected:
+
+- `click` should be `8.1.8`.
+- `appworld --help` should run without a Typer/Click crash.
+
+## Notes
+
+- Do not install this environment with `pip install appworld`; use the local source checkout.
+- `APPWORLD_PROJECT_PATH` should point to the `ace-appworld` repository root whenever you run AppWorld experiments.
+
+# Set up baseline environment
+
+## Set up ACE environment
+
+```bash
+cd ..
+git clone https://github.com/ace-agent/ace.git
+cd ace
+
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install ACE and core dependencies
+uv sync
+
+# Set up API keys
+cp .env.example .env
+# set the API key(s) and base url in .env as you need
+```
+
+If you would like to use keys other than the default provider api key provided by sambanova, you need to change the `provider` field of the corresponding jsonnet file. For example:
+```json
+local generator_model_config = {
+    "name": "your-choice-of-LLM",
+    "provider": "api-providers-name",
     "temperature": 0,
-    ...
+    "seed": 100,
+    "stop": ["<|endoftext|>", "<|eot_id|>", "<|start_header_id|>"],
+    "logprobs": false,
+    "top_logprobs": null,
+    "frequency_penalty": 0,
+    "presence_penalty": 0,
+    "n": 1,
+    "response_format": {"type": "text"},
+    "retry_after_n_seconds": 10,
+    "use_cache": true,
+    "max_retries": 50,
 };
 ```
 
-You do not have to edit the configuration files if you just want to reproduce the results in our paper. 
-
-### 2.3 (Optional) Customize Your Own ACE Agent
-
-The definition of the ACE pipeline is under ```experiments/code/ace```, mostly in ```adaptation_react.py``` and ```evaluation_react.py```. We will follow up soon with more instructions on how to customize your ACE agent to support additional functionalities like context compression, retrieval, etc.
-
-## 3. Run Experiments
-
-Here is the basic format of running an experiment: ```appworld run CONFIG_FILE_NAME```.
-
-### 3.1 Offline Context Adaptation with ACE
-
-As an example, run the AppWorld + ACE (offline adaptation) experiment on the training split with:
-```bash
-appworld run ACE_offline_no_GT_adaptation
-```
-
-After we obtain the offline-optimized context, run evaluation on the test-normal split with:
-```bash
-appworld run ACE_offline_no_GT_evaluation
-```
-This step is essential as we need to collect the generations using the trained playbook. The output of this run will be evaluated in the below section, not the training run. 
-
-### 3.1 Online Context Adaptation with ACE
-
-As an example, run the AppWorld + ACE (online adaptation) experiment on the test-normal split with:
-```bash
-appworld run ACE_online_no_GT
-```
-
-## 4. Evaluate Results
-
-After the run above completes, run the follow command to obtain the aggregated metrics. Replace ```CONFIG_FILE_NAME``` with the config file associated with your experiment (e.g., ```ACE_offline_no_GT_evaluation``` or ```ACE_online_no_GT```). This step does not generate any output, so make sure the configs you are evaluating have been run. This step should take no more than 2-3 minutes:
-```bash
-appworld evaluate CONFIG_FILE_NAME test_normal
-appworld evaluate CONFIG_FILE_NAME test_challenge
-```
-
-Here is an example of a generated evaluation report (on the test-normal split):
-| type         | task_goal_completion | scenario_goal_completion |
-|--------------|----------------------|---------------------------|
-| aggregate    | 64.9                 | 51.8                      |
-| difficulty_1 | 86.0                 | 79.0                      |
-| difficulty_2 | 77.1                 | 68.8                      |
-| difficulty_3 | 36.5                 | 14.3                      |
-
-We report aggregate TGC (```task_goal_completion```) and SGC (```scenario_goal_completion```) for evaluations in the paper.
-
-## 5. Contact
-
-If you have any questions, feel free to open a new issue or email at ```qizhengz@stanford.edu```. We’ll also be setting up a Slack/Discord channel soon to make communication easier.
-
-## 6. Reference
-
-If you find our work helpful, please use the following citation. Thank you for your support!
-```
-@article{zhang2025agentic,
-  title={{Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models}},
-  author={Zhang, Qizheng and Hu, Changran and Upasani, Shubhangi and Ma, Boyuan and Hong, Fenglu and Kamanuru, Vamsidhar and Rainton, Jay and Wu, Chen and Ji, Mengmeng and Li, Hanchen and others},
-  journal={arXiv preprint arXiv:2510.04618},
-  year={2025}
-}
-```
