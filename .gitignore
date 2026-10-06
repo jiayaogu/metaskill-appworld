@@ -49,6 +49,7 @@ coverage.xml
 *.cover
 *.py,cover
 .pytest_cache/
+reports/
 
 # Logs and DB
 *.log
@@ -74,7 +75,9 @@ __pypackages__/
 
 # Environments
 .env
-.venv
+.venv/
+.venv-appworld-only/
+.venv-clean-appworld/
 env/
 venv/
 ENV/

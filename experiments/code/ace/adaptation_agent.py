@@ -216,6 +216,7 @@ class StarAgent(FromDict):
         experiment_name: str | None = None,
         num_processes: int = 1,
         process_index: int = 0,
+        batch_size: int | None = None,
     ):
         num_tasks = len(task_ids)
         num_processes = min(num_processes, num_tasks)

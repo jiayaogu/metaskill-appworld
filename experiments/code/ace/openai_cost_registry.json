@@ -1,0 +1,79 @@
+{
+  "provider": "az.gptplus5.com",
+  "base_url": "https://az.gptplus5.com/v1",
+  "pricing_source": "https://az.gptplus5.com/api/pricing",
+  "pricing_currency": "USD",
+  "pricing_unit": "per_1m_tokens",
+  "pricing_formula": {
+    "input_usd_per_1m_tokens": "2 * model_ratio",
+    "output_usd_per_1m_tokens": "2 * model_ratio * completion_ratio",
+    "cache_read_usd_per_1m_tokens": "2 * model_ratio * cache_ratio when cache_ratio is present"
+  },
+  "models": {
+    "deepseek-v3": {
+      "available_for_calling": true,
+      "pricing_available": true,
+      "model_ratio": 0.5,
+      "completion_ratio": 4.0,
+      "input_usd_per_1m_tokens": 1.0,
+      "output_usd_per_1m_tokens": 4.0,
+      "cache_read_usd_per_1m_tokens": null,
+      "api_probe": {
+        "returns_usage": true,
+        "returns_price_or_cost": false
+      }
+    },
+    "qwen3-8b": {
+      "available_for_calling": true,
+      "pricing_available": true,
+      "model_ratio": 0.2,
+      "completion_ratio": 5.0,
+      "input_usd_per_1m_tokens": 0.4,
+      "output_usd_per_1m_tokens": 2.0,
+      "cache_read_usd_per_1m_tokens": null,
+      "api_probe": {
+        "returns_usage": true,
+        "returns_price_or_cost": false
+      }
+    },
+    "gemini-2.5-flash": {
+      "available_for_calling": false,
+      "pricing_available": false,
+      "input_usd_per_1m_tokens": null,
+      "output_usd_per_1m_tokens": null,
+      "cache_read_usd_per_1m_tokens": null,
+      "api_probe": {
+        "returns_usage": false,
+        "returns_price_or_cost": false,
+        "error": "503 model_not_found: No available channel for model gemini-2.5-flash under group default"
+      },
+      "notes": "No exact gemini-2.5-flash entry was present in /api/pricing. The provider exposed other Gemini models such as gemini-2.5-pro and gemini-3.x-flash variants."
+    },
+    "gpt-4.1": {
+      "available_for_calling": true,
+      "pricing_available": true,
+      "model_ratio": 1.3,
+      "completion_ratio": 4.0,
+      "cache_ratio": 0.25,
+      "input_usd_per_1m_tokens": 2.6,
+      "output_usd_per_1m_tokens": 10.4,
+      "cache_read_usd_per_1m_tokens": 0.65,
+      "api_probe": {
+        "returns_usage": true,
+        "returns_price_or_cost": false
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "available_for_calling": null,
+      "pricing_available": true,
+      "input_usd_per_1m_tokens": 0.45,
+      "output_usd_per_1m_tokens": 3.75,
+      "cache_read_usd_per_1m_tokens": 0.045,
+      "api_probe": {
+        "returns_usage": null,
+        "returns_price_or_cost": false
+      },
+      "notes": "Pricing from provider /api/pricing prior probe: input 0.45 USD/1M, output approximately 3.75 USD/1M, cache read 0.045 USD/1M."
+    }
+  }
+}
