@@ -1,5 +1,8 @@
 # Two-hour AppWorld conditional sample: quick2h_conditional
 
+The reusable TV-preserving selection and memory-pressure screening criteria
+are in [memory_pressure_screening.md](samples/memory_pressure_screening.md).
+
 ## Motivation and conditioning target
 
 This sample is separate from [quick2h_sampling.md](quick2h_sampling.md). A scenario

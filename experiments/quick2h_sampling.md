@@ -1,5 +1,9 @@
 # Two-hour ACE AppWorld pilot sample
 
+The reusable selection and audit criteria, including the topic TV definition
+and train-to-test shift check, are in
+[memory_pressure_screening.md](samples/memory_pressure_screening.md).
+
 ## Motivation: scenario content differs across splits
 
 The source splits have different task-content mixes. A scenario is the group of
