@@ -87,3 +87,5 @@ local generator_model_config = {
 };
 ```
 
+# Task loader and evaluator APIs 
+Guidance on how to load task datasets and how to produce per-task evaluation `report.md` is written in  
