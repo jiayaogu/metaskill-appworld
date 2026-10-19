@@ -114,7 +114,9 @@ generate/data/LICENSE
 generate/data/README_BEFORE_SHARING.md
 generate/tasks/task_generators/LICENSE
 generate/tasks/task_generators/README_BEFORE_SHARING.md
-data/
+data/api_docs
+data/base_dbs
+data/tasks/
 
 # AppWorld (private)
 src/appworld/apps/admin
