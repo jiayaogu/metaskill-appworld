@@ -42,6 +42,14 @@ class BaseAgent(FromDict):
         logger_config = logger_config or {}
         logger_config["cost_tracker"] = self.cost_tracker
         self.logger = Logger(**logger_config)
+        self.shared_services = None
+
+    def open_task_world(self, task_id: str, experiment_name: str):
+        if self.shared_services is None:
+            return AppWorld(task_id=task_id, experiment_name=experiment_name, **self.appworld_config)
+        if task_id != self.shared_services.episodes.task_id:
+            raise ValueError("ACE task differs from the shared EpisodeService task")
+        return self.shared_services.episodes.open(kind="primary")
 
     def initialize(self, world: AppWorld):
         self.world = world
@@ -61,9 +69,7 @@ class BaseAgent(FromDict):
     def solve_task(self, task_id: str, experiment_name: str | None = None):
         experiment_name = experiment_name or DEFAULT_EXPERIMENT_NAME
         self.cost_tracker.reset(task_id)
-        with AppWorld(
-            task_id=task_id, experiment_name=experiment_name, **self.appworld_config
-        ) as world:
+        with self.open_task_world(task_id, experiment_name) as world:
             execution_outputs: list[ExecutionIO] = []
             self.initialize(world)
             for _ in range(self.max_steps):

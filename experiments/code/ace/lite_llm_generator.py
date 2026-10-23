@@ -29,6 +29,12 @@ from rich.panel import Panel
 from appworld import AppWorld
 from appworld.common.path_store import path_store
 from appworld.common.utils import rprint, write_jsonl
+from appworld_experiments.code.common.lm_logger import (
+    LLMCallContext,
+    LLMCallLogger,
+    LLMLoggingError,
+    LiteLLMSerializer,
+)
 
 litellm.drop_params = True
 cache = Memory(os.path.join(path_store.cache, "llm_calls"), verbose=0)
@@ -274,9 +280,13 @@ class LiteLLMGenerator:
             # LiteLLM accepts these two arguments in completion function, whereas OpenAI
             # accepts them in the OpenAI constructor or in the environment variables.
             if "api_key" in generation_kwargs:
-                os.environ["OPENAI_API_KEY"] = generation_kwargs.pop("api_key")
+                api_key = generation_kwargs.pop("api_key")
+                if api_key is not None:
+                    os.environ["OPENAI_API_KEY"] = api_key
             if "base_url" in generation_kwargs:
-                os.environ["OPENAI_BASE_URL"] = generation_kwargs.pop("base_url")
+                base_url = generation_kwargs.pop("base_url")
+                if base_url is not None:
+                    os.environ["OPENAI_BASE_URL"] = base_url
             generation_kwargs.pop("custom_llm_provider", None)
         valid_generation_kwargs_keys = set(
             inspect.signature(CHAT_COMPLETION[completion_method]()).parameters.keys()
@@ -292,6 +302,15 @@ class LiteLLMGenerator:
         generation_kwargs["completion_method"] = completion_method
         self.generation_kwargs = generation_kwargs
         self.cost = 0
+        self.log_file_path = None
+        self.shared_call_logger: LLMCallLogger | None = None
+        self.shared_call_phase: str | None = None
+
+    def set_call_logger(self, logger: LLMCallLogger, *, phase: str) -> None:
+        """Bind a task logger without changing generation or retry policy."""
+
+        self.shared_call_logger = logger
+        self.shared_call_phase = phase
         self.log_file_path = None
 
     def generate(
@@ -310,7 +329,8 @@ class LiteLLMGenerator:
             return {"content": "", "tool_calls": [], "cost": 0}
 
         success = False
-        for _ in range(self.max_retries):
+        logical_call_id = uuid.uuid4().hex
+        for attempt in range(1, self.max_retries + 1):
             try:
                 arguments = {
                     "model": self.model,
@@ -318,11 +338,30 @@ class LiteLLMGenerator:
                     "tools": tools,
                     **(self.generation_kwargs | kwargs),
                 }
-                response = self.chat_completion(**arguments)
-                response["cost"] = self.completion_cost(completion_response=response)
-                self.may_log_call(arguments, response)
+                if self.shared_call_logger is None:
+                    response = self.chat_completion(**arguments)
+                    response["cost"] = self.completion_cost(completion_response=response)
+                    self.may_log_call(arguments, response)
+                else:
+                    def call_and_cost() -> dict[str, Any]:
+                        response = self.chat_completion(**arguments)
+                        response["cost"] = self.completion_cost(completion_response=response)
+                        return response
+
+                    response = self.shared_call_logger.invoke(
+                        provider_call=call_and_cost,
+                        request=arguments,
+                        context=LLMCallContext(
+                            phase=self.shared_call_phase or "generator",
+                            logical_call_id=logical_call_id,
+                            attempt=attempt,
+                        ),
+                        serializer=LiteLLMSerializer(),
+                    )
                 success = True
                 break
+            except LLMLoggingError:
+                raise
             except RETRY_ERROR as exception:
                 success = False
                 if self.retry_after_n_seconds is None:
@@ -351,6 +390,8 @@ class LiteLLMGenerator:
             write_jsonl([log_data], self.log_file_path, append=True, silent=True)
 
     def log_calls_to(self, file_path: str | None = None, world: AppWorld | None = None) -> None:
+        if self.shared_call_logger is not None:
+            return  # Unified runner owns this task's one canonical JSONL file.
         if (world and file_path) or (not world and not file_path):
             raise ValueError("Either world or file_path must be provided.")
         if world:

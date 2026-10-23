@@ -31,6 +31,7 @@ class StarAgent(FromDict):
         log_lm_calls: bool = False,
         use_reflector: bool = True,
         use_gt_code: bool = False,
+        num_retries_with_gt: int = 5,
     ):
         self.generator_model = LiteLLMGenerator(**generator_model_config)
         self.reflector_model = LiteLLMGenerator(**reflector_model_config)
@@ -58,8 +59,22 @@ class StarAgent(FromDict):
         self.playbook = ''
         self.current_task_index = 0  # Global variable to track current task index
         self.trained_playbook_file_path = None
-        self.num_retries = 5
+        self.num_retries = num_retries_with_gt
         self.use_gt_code = use_gt_code
+        self.shared_services = None
+
+    def open_task_world(self, task_id: str, experiment_name: str):
+        if self.shared_services is None:
+            return AppWorld(task_id=task_id, experiment_name=experiment_name, **self.appworld_config)
+        if task_id != self.shared_services.episodes.task_id:
+            raise ValueError("ACE task differs from the shared EpisodeService task")
+        return self.shared_services.episodes.open(kind="primary")
+
+    def evaluate_task_with_services(self, task_id: str, experiment_name: str):
+        if self.shared_services is None:
+            return evaluate_task(task_id, experiment_name)
+        result = self.shared_services.evaluator.evaluate_task()
+        return result.tracker, result.report
 
     def initialize(self, world: AppWorld):
         self.world = world
@@ -89,9 +104,7 @@ class StarAgent(FromDict):
         reasoning_text = ""
 
         for retry_id in range(self.num_retries):
-            with AppWorld(
-                task_id=task_id, experiment_name=experiment_name, **self.appworld_config
-            ) as world:
+            with self.open_task_world(task_id, experiment_name) as world:
                 execution_outputs: list[ExecutionIO] = []
                 self.initialize(world)
                 try: 
@@ -133,7 +146,7 @@ class StarAgent(FromDict):
                     self.log_cost()
                     if world.task_completed() or self.cost_tracker.exceeded():
                         self.curator_call()
-                        test_tracker, self.test_report = evaluate_task(task_id, experiment_name)
+                        test_tracker, self.test_report = self.evaluate_task_with_services(task_id, experiment_name)
                         if len(test_tracker.failures)>0:
                             reasoning_text = self.reflector_call()
                         else:
@@ -157,9 +170,7 @@ class StarAgent(FromDict):
         self.test_report = None
         gt_code = None
         reflections = []
-        with AppWorld(
-            task_id=task_id, experiment_name=experiment_name, **self.appworld_config
-        ) as world:
+        with self.open_task_world(task_id, experiment_name) as world:
             execution_outputs: list[ExecutionIO] = []
             self.initialize(world)
             print("---Max steps---: ", self.max_steps)
@@ -191,7 +202,7 @@ class StarAgent(FromDict):
                 self.cost_tracker.add(task_id, cost)
                 self.log_cost()
                 if world.task_completed() or self.cost_tracker.exceeded():
-                    test_tracker, self.test_report = evaluate_task(task_id, experiment_name)
+                    test_tracker, self.test_report = self.evaluate_task_with_services(task_id, experiment_name)
                     self.curator_call()
                     break
                         

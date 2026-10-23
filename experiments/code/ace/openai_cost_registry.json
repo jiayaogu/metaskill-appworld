@@ -74,6 +74,21 @@
         "returns_price_or_cost": false
       },
       "notes": "Pricing from provider /api/pricing prior probe: input 0.45 USD/1M, output approximately 3.75 USD/1M, cache read 0.045 USD/1M."
+    },
+    "qwen3.8-flash": {
+      "available_for_calling": true,
+      "pricing_available": true,
+      "model_ratio": 0.32,
+      "completion_ratio": 3.375,
+      "cache_ratio": 0.125,
+      "input_usd_per_1m_tokens": 0.64,
+      "output_usd_per_1m_tokens": 2.16,
+      "cache_read_usd_per_1m_tokens": 0.08,
+      "api_probe": {
+        "returns_usage": true,
+        "returns_price_or_cost": false
+      },
+      "notes": "Provider-routable retry alias for failed qwen3-8b quick2h runs; pricing from /api/pricing on 2026-10-13."
     }
   }
 }

@@ -47,6 +47,14 @@ class Agent(FromDict):
         self.previous_error_idx = None
         self.initial_code_idx = None
         self.playbook = ""
+        self.shared_services = None
+
+    def open_task_world(self, task_id: str, experiment_name: str):
+        if self.shared_services is None:
+            return AppWorld(task_id=task_id, experiment_name=experiment_name, **self.appworld_config)
+        if task_id != self.shared_services.episodes.task_id:
+            raise ValueError("ACE task differs from the shared EpisodeService task")
+        return self.shared_services.episodes.open(kind="primary")
 
     def initialize(self, world: AppWorld):
         self.world = world
@@ -72,9 +80,7 @@ class Agent(FromDict):
         self.previous_error_idx = None
         reflections = []
         
-        with AppWorld(
-            task_id=task_id, experiment_name=experiment_name, **self.appworld_config
-        ) as world:
+        with self.open_task_world(task_id, experiment_name) as world:
             execution_outputs: list[ExecutionIO] = []
             self.initialize(world)
 
