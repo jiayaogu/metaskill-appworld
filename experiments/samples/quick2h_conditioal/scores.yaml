@@ -1,0 +1,95 @@
+# Scores use only the three task instructions and their ground_truth/evaluation.py.
+# Candidate: every M/I/A/P/U score is at least 1. Rank by count(score=2), then sum.
+train:
+  e3d6c94:
+    M: {score: 2, evidence: "Variants change classical/R&B, this year/this or last year, and the playlist title.", justification: "The recommended-song workflow transfers, but reusing an old genre, year range, or title would select the wrong songs."}
+    I: {score: 2, evidence: "The evaluator separately checks recommended songs' genre, release year, and playlist membership.", justification: "The recommendation source, genre, and time rules must be retrieved together, while another variant's genre and time rules are distractors."}
+    A: {score: 2, evidence: "Filter by genre and release year, create the specified playlist, and add every matching song.", justification: "Execution combines multiple predicates, set collection, and a playlist write."}
+    P: {score: 1, evidence: "The evaluator separately checks the playlist title, genre, recency, and complete set of song IDs.", justification: "These checks localize a failure to naming, filtering, or omitted songs."}
+    U: {score: 2, evidence: "Recommendation lookup and playlist creation remain stable while genre and time window change.", justification: "The procedure should transfer, but the earlier genre and year range should not."}
+  c901732:
+    M: {score: 2, evidence: "Variants switch between an album and a playlist and between least and most played.", justification: "Ranking songs within a source before playing transfers, but an old source or ranking direction selects the wrong song."}
+    I: {score: 2, evidence: "The evaluator checks both source membership and the least/most-played target.", justification: "Source restriction and play-count ranking must be retrieved together, while the opposite ranking from another variant is a distractor."}
+    A: {score: 2, evidence: "Restrict to the named album or playlist, find the play-count extreme, and start playback.", justification: "Source filtering, extreme-value selection, and playback form a dependent action sequence."}
+    P: {score: 1, evidence: "The evaluator separately checks playback state, song source, and target song ID.", justification: "A failure can be attributed to playback, source selection, or the extreme-value choice."}
+    U: {score: 2, evidence: "Source filtering and playback stay the same, but album/playlist and least/most direction change.", justification: "The method transfers, while the specific source and ranking direction must be updated."}
+  afc0fce:
+    M: {score: 2, evidence: "Coworkers/friends/roommates, 5/7/10-day windows, and three comment texts vary.", justification: "Finding received payments and liking and commenting on them transfers, but an old group, window, or text would be wrong."}
+    I: {score: 2, evidence: "The evaluator separately checks liked transaction IDs, commented transaction IDs, and comment text.", justification: "Relationship, date, like, and comment rules must be retrieved together, while another variant's window and text are distractors."}
+    A: {score: 2, evidence: "Filter received payments by relationship and time, then like and comment on each match.", justification: "Multiple predicates are followed by two linked writes."}
+    P: {score: 1, evidence: "The evaluator distinguishes added likes, added comments, comment text, and like_count updates.", justification: "Feedback can localize a wrong transaction set, missing action, or incorrect comment."}
+    U: {score: 2, evidence: "Transaction filtering and the two actions stay stable, while relationship, days, and comment text change.", justification: "The procedure should be retained, but variant parameters must be reread to prevent stale values."}
+  7d7fbf6:
+    M: {score: 2, evidence: "The source directory changes among photographs/photos/pictures, and the archive format changes between zip and tar.", justification: "Archiving each vacation spot before deletion transfers, but an old path or format does not."}
+    I: {score: 2, evidence: "The evaluator checks new archive paths, original file contents, and removal of original directories.", justification: "Directory traversal, archive format, and cleanup rules must be used together, while another variant's format is a distractor."}
+    A: {score: 2, evidence: "Create an archive for each vacation spot, then remove its files and subdirectory.", justification: "Mapping several directories to archives, compression, and dependent cleanup must be composed."}
+    P: {score: 1, evidence: "The evaluator separately checks archive paths, removed file paths and contents, and removed directories.", justification: "A failure can be localized to archive naming, content handling, or cleanup."}
+    U: {score: 2, evidence: "One archive per vacation spot and source deletion remain stable, while parent directory and zip/tar format change.", justification: "Archiving and cleanup knowledge should transfer, but paths and format must be rebound."}
+  29caf6f:
+    M: {score: 2, evidence: "The requester changes among Christopher, Laura, and Leslie.", justification: "Filtering movies from a note and replying transfers, but reusing the previous recipient sends the message to the wrong person."}
+    I: {score: 2, evidence: "The evaluator checks the recipient, inclusion of director movie titles, and exclusion of other movie titles.", justification: "Requester resolution and note-filtering rules must be retrieved together, while unrelated movies in the note are distractors."}
+    A: {score: 2, evidence: "Resolve the requester, filter qualifying movies from Simple Note, and compose a comma-separated text message.", justification: "Entity resolution, set exclusion, and output formatting must be combined."}
+    P: {score: 1, evidence: "The evaluator separately checks the text recipient, required movies, and excluded movies.", justification: "Feedback can identify a wrong recipient, omission, or false inclusion."}
+    U: {score: 2, evidence: "Note filtering and text format remain stable, while the requester name changes.", justification: "The filtering workflow can be retained, but the message recipient must be resolved again."}
+test_normal:
+  fd1f8fa:
+    M: {score: 2, evidence: "Variants 1 and 3 remove liked songs, while variant 2 removes unliked songs.", justification: "Queue editing and playback transfer, but reusing the old liked/unliked condition deletes the wrong songs."}
+    I: {score: 2, evidence: "The evaluator checks both the final queue and player state.", justification: "Liked-status filtering and starting playback must be retrieved together, while the opposite filter from another variant is a distractor."}
+    A: {score: 2, evidence: "Select queued songs to remove by liked status, update the queue, and start playback.", justification: "Filtering, queue rewriting, and playback form an ordered action sequence."}
+    P: {score: 1, evidence: "The evaluator separately checks expected queued song IDs and playback state.", justification: "Feedback distinguishes deletion of the wrong songs from failure to start playback."}
+    U: {score: 2, evidence: "The queue operation stays the same, but liked versus unliked removal switches across variants.", justification: "Queue-operation knowledge transfers, while the old filter direction must be suppressed."}
+  ccf4b82:
+    M: {score: 2, evidence: "The approval window changes between this month and this-or-last month, and card suffixes are 8907/1102/4184.", justification: "Approving requests before withdrawing transfers, but an old time window or card number causes an error."}
+    I: {score: 2, evidence: "The evaluator checks approved request IDs, a zero Venmo balance, and the specified card balance.", justification: "Time filtering, approval, and withdrawal rules must be retrieved together, while another variant's card number is a distractor."}
+    A: {score: 2, evidence: "Filter pending requests, approve them, then withdraw the remaining balance to the specified card.", justification: "Request-set filtering, state updates, and the dependent funds transfer must be composed."}
+    P: {score: 1, evidence: "The evaluator separately checks request IDs, approved_at, Venmo balance, and card suffix and balance.", justification: "These checks distinguish a wrong request set, incomplete approvals, and a wrong withdrawal target."}
+    U: {score: 2, evidence: "Approval and withdrawal stay the same while month range and target card change.", justification: "The procedure should transfer, but the date range and card must be rebound."}
+  3b8fb7a:
+    M: {score: 2, evidence: "The trip and its note change among Maui, Athens, and Miami.", justification: "Settling debts from a note transfers, but copying an old destination, debt record, or description causes an error."}
+    I: {score: 2, evidence: "The evaluator separately checks new payments, payment requests, amount mappings, and trip descriptions.", justification: "The correct note, debt direction, and Venmo action must be retrieved together, while other trip records are distractors."}
+    A: {score: 2, evidence: "Read the corresponding trip note and branch to private payments or requests based on debt direction.", justification: "Entity and amount extraction, direction decisions, and two write types must be combined."}
+    P: {score: 1, evidence: "The evaluator separately checks recipient-to-amount mappings and descriptions for payments and requests.", justification: "Feedback can localize a direction, amount, or description error."}
+    U: {score: 2, evidence: "Note parsing and payment/request branching transfer, but trip and amount data do not.", justification: "The workflow should transfer, while specific debt records must be read from the current variant."}
+  f323bae:
+    M: {score: 2, evidence: "The CSV path changes, and date order switches between ascending and descending.", justification: "The note-to-CSV procedure transfers, but an old path or sort order fails."}
+    I: {score: 2, evidence: "The evaluator separately checks file path, header, cell values, and row and column order.", justification: "Log parsing, date format, and output-contract rules must be retrieved together, while an old sort order is a distractor."}
+    A: {score: 2, evidence: "Parse habit logs, build a yes/no matrix, sort by date, and write a CSV.", justification: "Structure conversion, sorting, and file output must be composed."}
+    P: {score: 1, evidence: "The evaluator checks path, header, and CSV contents with progressively stricter order checks.", justification: "Feedback distinguishes wrong content, column order, and row order."}
+    U: {score: 2, evidence: "Log parsing and CSV schema stay stable, while export path and sort direction change.", justification: "The schema should transfer, but the current path and direction must be updated."}
+  3aa1a22:
+    M: {score: 2, evidence: "Invitations arrive by text or voice message, within yesterday, the day before, or this week.", justification: "Checking contacts before handling invitations transfers, but an old message type or time window misses targets."}
+    I: {score: 2, evidence: "The evaluator separately checks added Splitwise group members and deleted phone message IDs.", justification: "Message source, contact matching, and accept/delete rules must be retrieved together, while old media and windows are distractors."}
+    A: {score: 2, evidence: "Find invitations by time and message type, match senders to contacts, then accept or delete.", justification: "Multiple filters, cross-app entity matching, and conditional branches must be composed."}
+    P: {score: 1, evidence: "The evaluator independently checks accepted group IDs, user IDs, and deleted message IDs.", justification: "Feedback localizes a failure to the acceptance or deletion branch."}
+    U: {score: 2, evidence: "Contact matching and the two actions remain stable, while message medium and time window change.", justification: "The decision rule transfers, but the query scope must be rebound to the current variant."}
+test_challenge:
+  07bb666:
+    M: {score: 2, evidence: "Direction switches between cart-to-wish-list and wish-list-to-cart, with rating thresholds 4.2/3.7/4.3.", justification: "Moving products by rating transfers, but an old direction or threshold moves the wrong products."}
+    I: {score: 2, evidence: "The evaluator checks final product IDs and quantities in both lists.", justification: "Rating condition, source and target lists, and quantity-preservation rules must be retrieved together, while an old direction is a distractor."}
+    A: {score: 2, evidence: "Filter source-list products by the current rating threshold and move them while preserving quantities.", justification: "Predicate filtering, set transfer, and final-state checking must be combined."}
+    P: {score: 1, evidence: "The evaluator separately checks product sets and quantity mappings in the cart and wish list.", justification: "Feedback localizes a wrong direction, missing product, or quantity error."}
+    U: {score: 2, evidence: "Rating-based selection and transfer remain stable, while direction and threshold change.", justification: "Transfer rules should carry over, but the old threshold and source list should not."}
+  b0934aa:
+    M: {score: 2, evidence: "Product type, price/rating/review thresholds, and home/work address vary.", justification: "Multi-constraint product selection and ordering transfer, but old thresholds or an old address violate the task."}
+    I: {score: 2, evidence: "The evaluator individually checks price, rating, review count, and delivery address.", justification: "Product filters and address rules must be jointly retrieved, while another variant's thresholds and address are distractors."}
+    A: {score: 2, evidence: "Filter by type, price, rating, and review count, then order to the specified address.", justification: "The intersection of four predicates and the order contract must be combined."}
+    P: {score: 1, evidence: "The evaluator separately checks ordered product type, thresholds, and delivery address.", justification: "A failure can be localized to product selection or delivery information."}
+    U: {score: 2, evidence: "Multi-constraint ordering stays stable, while thresholds and delivery location vary.", justification: "The workflow should be retained, but specific constraints must be reread."}
+  6d59d90:
+    M: {score: 2, evidence: "Product type changes among face shields, safety goggles, and insect repellent, with 4/3/5-day delivery limits.", justification: "Funding a card from Venmo before buying transfers, but an old product or deadline causes an error."}
+    I: {score: 2, evidence: "The evaluator checks the lowest qualifying price, delivery days, Venmo balance, and order.", justification: "Delivery constraints, cheapest-product selection, and exact funding rules must be retrieved together, while old products and deadlines are distractors."}
+    A: {score: 2, evidence: "Find the cheapest item within the delivery limit, calculate required funds, transfer them, and place the order.", justification: "Filtering, minimization, amount calculation, and dependent actions must be combined."}
+    P: {score: 1, evidence: "The evaluator separately checks ordered product price and delivery days and the Venmo balance change.", justification: "Feedback distinguishes product-selection errors from funds-transfer errors."}
+    U: {score: 2, evidence: "Cheapest timely delivery and card funding stay stable, while product category and deadline change.", justification: "The decision process transfers, but current product type and deadline must be rebound."}
+  a3ba388:
+    M: {score: 2, evidence: "Attachment filename and scheduled day change among next Monday, the Tuesday after next, and next Wednesday.", justification: "Attaching a file to a draft for the manager and scheduling it transfers, but an old file or date cannot be reused."}
+    I: {score: 2, evidence: "The evaluator checks draft, manager recipient, send time, attachment content, and attachment ownership.", justification: "Target draft, file, and scheduling rules must be retrieved together, while other variants' dates and paths are distractors."}
+    A: {score: 2, evidence: "Locate the draft and file, attach its content, and set the manager recipient and send time.", justification: "Cross-app entity resolution, attachment creation, and scheduling must be composed."}
+    P: {score: 1, evidence: "The evaluator separately checks draft ID, recipient, and time, plus attachment content and draft_id.", justification: "Feedback distinguishes a wrong draft, attachment, or schedule."}
+    U: {score: 2, evidence: "Attachment and scheduled sending remain stable, while path and relative date change.", justification: "The steps transfer, but the file and send time must be recomputed for each variant."}
+  321ec38:
+    M: {score: 2, evidence: "Destinations change among Toronto, Singapore, and Rome, with lead times of 2 hours, 90 minutes, and 2.5 hours.", justification: "Setting an alarm from a confirmation email transfers, but an old flight or lead time gives the wrong alarm time."}
+    I: {score: 2, evidence: "The evaluator checks alarm time, repeat day, destination label, and enabled state.", justification: "Flight email, time-offset, and alarm-attribute rules must be retrieved together, while another variant's lead time is a distractor."}
+    A: {score: 2, evidence: "Find the flight in email, compute the earlier time and date, then create an enabled alarm with the matching label.", justification: "Entity resolution, time arithmetic, and the alarm output contract must be combined."}
+    P: {score: 1, evidence: "The evaluator separately checks new alarm time, date, label, and enabled state.", justification: "A failure can be localized to flight or time parsing or to alarm fields."}
+    U: {score: 2, evidence: "Reading a confirmation email and setting an alarm stay stable, while destination and lead time change.", justification: "The workflow transfers, but the specific flight and offset must be obtained again."}

@@ -89,6 +89,21 @@ unigrams/bigrams with English stop words and sublinear term frequency, take
 cosine similarity to the closest train family, then bin by the full test
 split's 25th/75th percentiles.
 
+### Ten-topic probability vectors
+
+The coordinate order for every vector is
+`[Amazon, Gmail, Todoist, Splitwise, Spotify, Venmo, Simple Note, Phone, File system, Other]`.
+Each scenario has weight 1; its three task variants each have weight 1/3,
+divided equally among the topics tagged in that variant. These are topic
+**probabilities**, not counts of scenarios mentioning an app. All entries are
+rounded to four decimal places.
+
+```text
+conditional train          = [0.0000, 0.0000, 0.0000, 0.0000, 0.4000, 0.2000, 0.1000, 0.1000, 0.2000, 0.0000]
+conditional test_normal    = [0.0000, 0.0000, 0.0000, 0.1000, 0.2000, 0.3000, 0.2000, 0.1000, 0.1000, 0.0000]
+conditional test_challenge = [0.5000, 0.1000, 0.0000, 0.0000, 0.0000, 0.1000, 0.0000, 0.2000, 0.1000, 0.0000]
+```
+
 | Split | Topic TV | Difficulty TV | App-count TV | Novelty-bin TV |
 | --- | ---: | ---: | ---: | ---: |
 | Train | 0.1000 | 0.0000 | 0.1333 | — |

@@ -1,0 +1,35 @@
+## STRATEGIES AND HARD RULES
+[shr-00001] Make sure to end code blocks with ``` followed by a newline(\n).
+[shr-00005] Always look at API specifications (using apis.api_docs.show_api_doc) before calling an API.
+[shr-00006] Write small chunks of code and only one chunk of code in every step. Make sure everything is working correctly before making any irreversible change.
+
+[shr-00009] For Amazon order tasks, resolve payment_card_id and address_id from authoritative account defaults before calling place_order. Use amazon.show_account and/or supervisor account information to retrieve default_payment_card_id/default_address_id. Do not choose cards/addresses based on heuristics such as token expiry, card name, or item size; if no default exists, deterministically select a valid saved card/address and document the fallback.
+[shr-00014] Amazon payment/address fallback: if default_payment_card_id/default_address_id are not present in amazon.show_account, exhaust supervisor.show_profile, supervisor.show_payment_cards/show_addresses, and amazon.show_payment_cards/show_payment_card/show_addresses for default/status fields. If still absent, select deterministic IDs in sorted order and validate via API acceptance, retrying the next card/address on failures such as expired-card errors; never prefilter by expiry, card name, or address nickname.
+[shr-00017] Amazon place_order fallback must be exception-safe: documented 422 expired-card failures may raise a Python Exception instead of returning a failure dict. Before running any multi-card/multi-address irreversible loop, wrap each place_order attempt in try/except, treat exceptions as failed attempts, continue deterministic sorted IDs, and stop only when a response contains order_id.
+## APIs TO USE FOR SPECIFIC INFORMATION
+[api-00004] You can use the "supervisor" app to get information about my accounts and use the "phone" app to get information about friends and family.
+
+[api-00011] Amazon selective-order schemas: show_cart returns a dict with cart_items list; show_product returns product_type, which should be used for classification instead of product name; move_product_from_cart_to_wish_list requires product_id/access_token and defaults quantity to 1, so pass full cart quantity; place_order requires payment_card_id/address_id/access_token and orders all cart items; show_payment_cards and show_addresses return lists; show_order verifies the placed order by order_id.
+[api-00015] Amazon account/card/address schemas: amazon.show_account may return only profile fields and no default_payment_card_id/default_address_id; supervisor.show_payment_cards may return card details without payment_card_id/default flag; amazon.show_payment_cards returns payment_card_id list without default/status; amazon.show_addresses returns address_id list without default. Treat place_order 422 expired-card responses as authoritative validation for fallback selection.
+[api-00018] Amazon runtime schemas: apis.amazon.place_order success returns a dict containing order_id; expired/invalid card failures may raise Exception with a 422 message rather than return the documented failure dict. apis.amazon.show_wish_list returns a list of wishlist product dicts with product_id, product_name, quantity, and price. apis.amazon.show_order returns a dict with order_items list containing product_id, ordered_quantity, and gift_wrap_quantity.
+## USEFUL CODE SNIPPETS AND TEMPLATES
+
+[code-00013] Selective Amazon order template: after show_cart, classify each item with show_product(product_id)['product_type']; move non-target items to wishlist using quantity=item['quantity']; verify cart; place_order(access_token=..., payment_card_id=default_payment_card_id, address_id=default_address_id); if non-target items must remain, move them back using move_product_from_wish_list_to_cart(access_token=..., product_id=..., quantity=item['quantity']); verify with show_order(order_id).
+## COMMON MISTAKES AND CORRECT STRATEGIES
+
+[cms-00010] When an API affects all items in a collection, such as amazon.place_order ordering the entire cart, isolate only the target items temporarily and restore non-target items after the action unless the task explicitly says to remove them. Moving non-target items to the wishlist is not a safe default because it permanently changes wishlist/cart state.
+[cms-00019] When using wishlist moves to isolate cart items for selective ordering, first snapshot the complete original cart state including product_id, quantity, and gift_wrap_quantity, and snapshot the original wishlist state including product_id and quantity. After ordering, restore non-target items with exact quantities and reapply gift wrapping if needed; compare final cart and wishlist to the baseline, not merely to the absence of temporarily moved items.
+## PROBLEM-SOLVING HEURISTICS AND WORKFLOWS
+[psw-00002] Remember you can use the variables in your code in subsequent code blocks.
+[psw-00007] Many APIs return items in "pages". Make sure to run through all the pages by looping over `page_index`.
+
+## VERIFICATION CHECKLIST
+
+[vc-00012] Before irreversible order placement, verify the cart contains only intended product_type items after moving non-target items. After placing the order, verify with show_order(order_id) and restore non-target items to the cart if preservation is required before calling complete_task.
+[vc-00016] After selective-order restoration, verify final cart contains all original non-target product_ids with exact original quantities and that the wishlist no longer contains those temporarily moved non-target items, or otherwise matches the pre-move wishlist state, before calling complete_task.
+[vc-00020] Before Amazon fallback ordering, verify you have actually called and inspected returned data from supervisor.show_payment_cards, supervisor.show_addresses, amazon.show_payment_cards, amazon.show_payment_card for each card, and amazon.show_addresses for default or status fields; do not stop after reading API docs. If no default is found, use the exception-safe deterministic place_order loop.
+## TROUBLESHOOTING AND PITFALLS:
+
+## OTHERS
+[misc-00003] Remember that the email addresses, access tokens and variables (e.g. spotify_password) in the example above are not valid anymore.
+[misc-00008] Once you have completed the task, make sure to call apis.supervisor.complete_task(). If the task asked for some information, return it as the answer argument, i.e. call apis.supervisor.complete_task(answer=<answer>). Many tasks do not require an answer, so in those cases, just call apis.supervisor.complete_task() i.e. do not pass any argument.

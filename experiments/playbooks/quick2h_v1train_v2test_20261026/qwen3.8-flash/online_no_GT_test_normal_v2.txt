@@ -1,0 +1,90 @@
+## STRATEGIES AND HARD RULES
+[shr-00001] Make sure to end code blocks with ``` followed by a newline(\n).
+[shr-00005] Always look at API specifications (using apis.api_docs.show_api_doc) before calling an API.
+[shr-00006] Write small chunks of code and only one chunk of code in every step. Make sure everything is working correctly before making any irreversible change.
+
+[shr-00030] Current task specification overrides playbook examples. Before reusing any CSV/export snippet, verify that its file path, filename, and row order match the requested task. For ~/backups/simple_note/habits.csv, use ascending date rows; do not reuse ~/backups/habit_log.csv descending-date assertions unless the task explicitly requires descending order.
+## APIs TO USE FOR SPECIFIC INFORMATION
+[api-00004] You can use the "supervisor" app to get information about my accounts and use the "phone" app to get information about friends and family.
+
+[api-00011] For Venmo friend tasks: phone.search_contacts returns contact objects with email, phone_number, and relationships; venmo.search_friends returns friend objects with email; venmo.add_friend returns a dict like {'message': 'Added to your friend list.'} on success.
+[api-00015] apis.phone.search_contacts returns contact objects including contact_id, first_name, last_name, email, phone_number, and relationships; apis.venmo.search_friends returns friend objects including first_name, last_name, and email; apis.venmo.search_users can resolve a Venmo user/email by name when a contact email is missing or uncertain before calling apis.venmo.add_friend.
+[api-00021] Simple Note/file_system export schemas: apis.simple_note.search_notes returns note metadata only (note_id, title, tags, created_at, updated_at, pinned); use tags=['habit-tracker'] for habit logs rather than relying only on query, and paginate. apis.simple_note.show_note returns a dict with a full 'content' string; parse that variable, not console output. apis.file_system.directory_exists returns {'exists': bool}; apis.file_system.create_file accepts '~/...' paths and returns {'message': ..., 'file_path': '/home/...'} with an absolute path; apis.file_system.show_file returns {'content': ...}. apis.supervisor.show_account_passwords returns a list of {'account_name': ..., 'password': ...}; apis.phone.send_text_message returns {'message': ..., 'text_message_id': ...}.
+[api-00025] apis.file_system.show_file returns the file content and may have file_path=None; do not rely on show_file to verify the saved path. Use the response from apis.file_system.create_file, which returns the authoritative absolute file_path, for path verification, and use show_file only to verify content.
+## USEFUL CODE SNIPPETS AND TEMPLATES
+
+[code-00017] def norm(s): return (s or '').strip().lower()
+def full_name(x): return norm(x.get('first_name')) + ' ' + norm(x.get('last_name'))
+intended = {c['contact_id']: c for c in coworker_contacts + friend_contacts}
+existing_keys = {norm(f['email']) for f in existing_friends if f.get('email')} | {full_name(f) for f in existing_friends}
+missing = [c for c in intended.values() if norm(c.get('email')) not in existing_keys and full_name(c) not in existing_keys]
+[code-00019] def norm(s): return (s or '').strip().lower()
+def full_name(x): return norm(x.get('first_name')) + ' ' + norm(x.get('last_name'))
+existing_emails = {norm(f['email']) for f in existing_friends if f.get('email')}
+existing_names = {full_name(f) for f in existing_friends}
+by_id = {c['contact_id']: c for c in coworker_contacts + roommate_contacts}
+intended = {}
+for c in by_id.values():
+    key = norm(c.get('email')) or full_name(c)
+    intended.setdefault(key, c)
+resolved = {}
+for key, c in intended.items():
+    email = norm(c.get('email'))
+    if email and email in existing_emails:
+        continue
+    if not email and full_name(c) in existing_names:
+        continue
+    if email:
+        users = apis.venmo.search_users(access_token=venmo_access_token, query=email, page_limit=20)
+        match = next((u for u in users if norm(u.get('email')) == email), None)
+        if match:
+            c['target_email'] = match['email']
+            resolved[key] = c
+    else:
+        users = apis.venmo.search_users(access_token=venmo_access_token, query=full_name(c), page_limit=20)
+        match = next((u for u in users if full_name(u) == full_name(c)), None)
+        if match and match.get('email'):
+            c['target_email'] = match['email']
+            resolved[key] = c
+# Add only resolved: apis.venmo.add_friend(access_token=venmo_access_token, user_email=c['target_email'])
+[code-00022] import re; def note_date(n): m = re.search(r'(\d{4}-\d{2}-\d{2})', n.get('title', '')); return m.group(1) if m else n['created_at'][:10]; # habit export template: search_notes(tags=['habit-tracker']) with pagination; dedupe by date keeping latest updated_at; sort dates ascending; for each note parse full content with re.match(r'^\s*([^:\n]+):\s*(yes|no)\s*$', line, re.I); build habit_order from earliest chronological log and append new habits; build CSV manually with ','.join(...) and trailing newline, not io.StringIO; create_directory if needed and create_file(overwrite=True).
+[code-00027] file_result = apis.file_system.create_file(file_path='~/backups/habit_log.csv', access_token=fs_access_token, content=csv_text, overwrite=True)
+assert file_result['file_path'].endswith('/backups/habit_log.csv')
+shown = apis.file_system.show_file(file_path='~/backups/habit_log.csv', access_token=fs_access_token)
+assert shown['content'] == csv_text
+lines = shown['content'].splitlines()
+header = lines[0].split(',')
+assert header[0] == 'date'
+assert header[1:] == habit_order
+dates = [ln.split(',')[0] for ln in lines[1:] if ln]
+assert dates == sorted(dates, reverse=True)
+assert all(len(ln.split(',')) == len(header) for ln in lines[1:] if ln)
+assert all(cell in ('yes', 'no', '') for ln in lines[1:] if ln for cell in ln.split(',')[1:])
+## COMMON MISTAKES AND CORRECT STRATEGIES
+
+[cms-00010] Do not deduplicate or match people by only one identifier such as phone_number or email. Normalize and compare available identifiers (email, name, phone) when resolving contacts across apps, and verify the final state to avoid missing or duplicate entries.
+[cms-00014] When collecting intended people from multiple relationship filters (e.g., coworker and friend), deduplicate by stable contact_id first; do not assume relationship-filtered contact lists are disjoint. Then match against existing Venmo friends using normalized email and normalized full name, treating email as preferred but allowing exact full-name match when email is missing/inconsistent.
+[cms-00018] Never collapse Venmo identity checks into a single OR set of emails and names. If an intended contact has a valid/resolved email, that email must match an existing Venmo friend before marking them already added; a full-name match alone is only a fallback when the contact email is missing, invalid, or unresolved. Before mutating state, deduplicate intended contacts by contact_id and by normalized email/name, and only add contacts whose email has been resolved to a Venmo user.
+[cms-00023] For note-to-CSV tasks: do not derive columns from search_notes order (newest/pinned first); sort by log date before parsing. Use tags=['habit-tracker'] instead of relying on query='habit'. Deduplicate by date (keep latest updated_at) and leave a cell blank if a habit is not present in that date's log. Do not use disallowed modules such as io (e.g., io.StringIO); build CSV text with string joins.
+[cms-00028] When parsing structured notes, if the parser returns an empty result even though the raw content visibly contains matches, treat it as a parser bug rather than a data problem. Fix the parser to use the full API response variable and preserve original line indentation; never manually hardcode a few visible items from truncated console output as a fallback.
+[cms-00029] For habit CSV exports, separate internal chronological ordering from output ordering: build habit_order from the earliest chronological log, but sort CSV rows according to the task requirement, such as descending dates for ~/backups/habit_log.csv. Do not let the ascending sort used to establish column order accidentally produce ascending output rows.
+[cms-00031] Do not skip live API-doc checks for APIs that appear simple or already have playbook schemas, such as apis.supervisor.show_account_passwords, apis.simple_note.login, apis.file_system.show_file, and apis.file_system.create_file. After each call, validate against the documented success/failure schema: if a failure 'message' is present or expected success keys such as access_token, content, or file_path are missing, stop and fix before continuing.
+## PROBLEM-SOLVING HEURISTICS AND WORKFLOWS
+[psw-00002] Remember you can use the variables in your code in subsequent code blocks.
+[psw-00007] Many APIs return items in "pages". Make sure to run through all the pages by looping over `page_index`.
+
+## VERIFICATION CHECKLIST
+
+[vc-00012] For action tasks that mutate state: check each API response for success, collect any failures, then re-fetch the authoritative list and verify all intended items are present before calling apis.supervisor.complete_task().
+[vc-00016] For Venmo add-friend tasks, validate each intended contact's email before calling add_friend; if invalid/missing, use search_users to resolve an email or record the contact as unresolved. Collect add_friend failures keyed by contact_id, then re-fetch final friends and verify every unique intended contact_id is represented by at least one matched identifier (email or exact normalized full name).
+[vc-00020] For final verification, use the same conditional hierarchy: if the contact had a valid/resolved email, require that exact normalized email to appear in the re-fetched Venmo friends; only if the contact had no usable email may you verify by exact normalized full name. Do not count a name-only match as success when a different email is expected, because it may be a different person.
+[vc-00024] For CSV exports: after create_file, call show_file and verify header starts with 'date', dates are unique and ascending, every row has same number of fields as header, habit cells are only yes/no or blank for missing, and file_path is the requested home path. For tasks requiring comma-separated lists, send exactly comma-separated values with no prose prefix or suffix.
+[vc-00026] For CSV exports, verify the requested row order explicitly: for habit_log.csv, dates must be unique and descending, not ascending. After create_file, assert file_result['file_path'].endswith('/backups/habit_log.csv'); after show_file, assert shown['content'] == csv_text, header[0] == 'date', header[1:] == habit_order, every data row has the same number of fields as the header, and habit cells are only yes/no or blank.
+[vc-00032] For habit CSV exports, explicitly verify the requested filename/path and task-specified row order. Assert file_result['file_path'].endswith('/backups/simple_note/habits.csv') for this task, and assert dates == sorted(dates) for ascending tasks (use sorted(dates, reverse=True) only when the task requires descending). For file creation/export tasks, call apis.supervisor.complete_task() without an answer unless the task asks for information.
+## TROUBLESHOOTING AND PITFALLS:
+
+[ts-00009] When parsing structured text or notes, preserve leading whitespace. Do not call line.strip() before checking for indented list markers such as ' - '; use line.lstrip() or regex to detect headings, titles, and indented fields. Never hardcode results from truncated console output; re-fetch full content or parse programmatically.
+## OTHERS
+[misc-00003] Remember that the email addresses, access tokens and variables (e.g. spotify_password) in the example above are not valid anymore.
+[misc-00008] Once you have completed the task, make sure to call apis.supervisor.complete_task(). If the task asked for some information, return it as the answer argument, i.e. call apis.supervisor.complete_task(answer=<answer>). Many tasks do not require an answer, so in those cases, just call apis.supervisor.complete_task() i.e. do not pass any argument.
+[misc-00013] For 'add all friends/roommates' tasks: retrieve contacts by relationship with pagination; deduplicate by normalized email/name; retrieve existing Venmo friends with pagination; add missing contacts by email; optionally confirm Venmo user existence with search_users; verify the final Venmo friend list.

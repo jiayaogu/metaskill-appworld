@@ -1,0 +1,678 @@
+## STRATEGIES AND HARD RULES
+[shr-00001] Make sure to end code blocks with ``` followed by a newline(\n).
+[shr-00005] Always look at API specifications (using apis.api_docs.show_api_doc) before calling an API.
+[shr-00006] Write small chunks of code and only one chunk of code in every step. Make sure everything is working correctly before making any irreversible change.
+
+[shr-00009] For irreversible financial actions, resolve identities from authoritative sources before sending/requesting money: use phone contacts to confirm full names/emails/relationships, then Venmo search_friends/search_users; paginate all pages, filter exact name matches, and require exactly one candidate. If multiple or none, disambiguate with contact email/relationship or stop rather than guessing.
+[shr-00014] For irreversible financial actions, never rely on manually scanning printed API outputs. Enforce identity resolution, duplicate prevention, and post-creation verification with deterministic filters, sets, and assertions. If a matching existing payment or request exists, skip or stop rather than creating a duplicate.
+[shr-00020] For irreversible messaging actions, apply the same deterministic pipeline as financial actions: resolve recipient from paginated authoritative contacts, extract payload from notes/APIs programmatically, validate count/format, and only send after assertions pass.
+[shr-00022] For file-export tasks, do not assume standard Python modules such as io are available; build CSV/text content with pure string operations, validate delimiter safety, and verify the written file by exact read-back equality before completing the task.
+[shr-00028] For file-export tasks, run a preflight before any write: print supervisor.show_account_passwords and match exact account_name; call show_api_doc for file_system.login and use the actual username field; check parent directory with directory_exists and create it if an API exists; check target file_exists and set overwrite intentionally; assert create_file returns expected file_path and file_exists after write; only then read back. Do not combine credential lookup, parsing, CSV build, directory checks, write, and completion in one irreversible block.
+[shr-00033] For file-export tasks, verify against the canonical path returned by file_system.create_file, not the input path. The API may expand '~' to an absolute home path, so do not assert created['file_path'] == target when target starts with '~'. Use created['file_path'] for file_exists/show_file, or assert suffix/normalized equality. If a playbook template conflicts with explicit task wording, such as ascending vs descending sort, follow the task wording.
+[shr-00037] For bulk irreversible metadata transformations such as appending computed values to titles, make updates idempotent: reconstruct the base title by stripping only known task suffixes before appending the new suffix, skip updates when current title already equals desired title, and verify after re-fetch that no duplicated suffixes were created.
+[shr-00038] When selecting a most-common value from counts, define a deterministic tie-break before execution, such as choosing the alphabetically smallest tied genre, and use it consistently; do not assume ties cannot occur or assert that exactly one tied value exists.
+[shr-00039] Do not assume standard-library modules such as collections.Counter are available for aggregation; use plain dict counting, e.g. counts[genre] = counts.get(genre, 0) + 1, to keep code portable and deterministic.
+[shr-00045] For bulk irreversible metadata transformations, strip task suffixes using the canonical domain of possible suffix values (e.g., spotify.show_genres), not only values observed in current records; assert target records are uniquely identified and owned by the supervisor; define empty-record behavior explicitly before updates, such as skipping empty playlists rather than inventing a value.
+[shr-00049] When building lookup dictionaries across multiple code blocks, canonicalize identifier types immediately after retrieval and use the same type everywhere. For Spotify playlist_id, keep it as int because show_playlist_library/show_playlist return integer playlist_id and update_playlist requires integer playlist_id. Normalize song ids to str only for song_genre maps. Do not store playlist keys as int in one block and look them up as str in another.
+[shr-00054] For time-window counts such as 'since the start of January this year', anchor the window to an authoritative current date/year. Use an explicit current-date API if present; otherwise corroborate the year with at least two independent authoritative timestamps (e.g., latest friends_since/created_at/sent_at and JWT/token expiry) and assert they agree. Parse timestamps as datetimes or validated ISO parts, deduplicate records by canonical identifier (e.g., email) before counting, and compare to datetime(current_year,1,1); do not rely on a single inferred year or raw string prefix.
+[shr-00059] For relative calendar windows such as 'since the start of October last year', determine current_date from an explicit current-date API if present; otherwise parse auth token exp claims programmatically and corroborate with a second independent token/exp. Do not use max/latest record timestamps (friends_since/created_at/sent_at) as current-date evidence; they only prove data range. Assert current_date is not inferred from a single manually read token, and assert every record timestamp <= current_date. Compute 'last year' cutoff as datetime(current_date.year - 1, 10, 1), not a rolling 12-month window.
+[shr-00064] Treat every new task as a fresh API-documentation session: maintain a documented_apis set and call apis.api_docs.show_api_doc before the first call to any API in that task, including supervisor.show_account_passwords, venmo.login, venmo.search_friends, phone.login, and supervisor.complete_task; never assume documentation from a prior task/example is valid.
+[shr-00069] For irreversible inbox triage actions such as accepting/deleting received messages, do not treat keyword search as the complete source of truth. Enumerate all received messages for the date window by paginating phone.search_text_messages without query (or merge no-query with keyword queries), deduplicate by text_message_id, filter direction to receiver.phone_number == supervisor phone_number and sender.phone_number != supervisor phone_number, then classify every matching candidate into accept/delete lists and loop over all of them. Do not assert exactly one accept or one delete unless the task explicitly says so; only delete non-contact candidates and keep accepted messages unless the task says to delete them after accepting.
+[shr-00070] For inbox actions, make irreversible accept/delete idempotent and verifiable: before accepting a Splitwise invitation, fetch all splitwise.show_groups pages and skip if the extracted invitation_code already exists; after accepting, re-fetch groups and assert the code is present. Before deleting a text message, check existence or treat a 409 'does not exist' response as already deleted; after deleting, verify absence by show_text_message raising 409. Normalize phone numbers to digits-only before contact membership checks, and parse message sent_at as validated ISO date/time rather than relying on string prefixes.
+[shr-00075] For voice-message inbox triage, do not reuse text-message assumptions or keyword search as the complete inventory. Enumerate phone.search_voice_messages without query, deduplicate by voice_message_id, filter receiver.phone_number == supervisor and sender.phone_number != supervisor, and compute relative dates from phone.get_current_date_and_time (day before yesterday = current_date - 2 days). Parse sent_at as full ISO datetime. Classify every target-date received message into invitation candidate or explicitly ignored non-invitation using a broad deterministic predicate (extractable invitation code plus Splitwise/invitation/invite/group/join wording), not manually observed wording. Deduplicate accept actions by invitation_code, skip codes already present in splitwise.show_groups or already accepted in the current run, and verify accepted invitation messages and ignored non-invitation messages remain after irreversible actions.
+[shr-00079] For irreversible inbox triage, never manually copy IDs or classifications from printed output into accept/delete action lists. Build accept/delete lists programmatically from the in-memory candidate list and contact membership set, assert len(accept)+len(delete)==len(candidates), and if variables are lost recompute from authoritative APIs before any irreversible action.
+[shr-00080] For 'this week' inbox triage, anchor the window to phone.get_current_date_and_time: parse the human-readable date, compute Monday of the current week through current date inclusive, document the Monday-start assumption, filter received messages by validated ISO sent_at, and assert no future timestamps; do not hardcode current_date.
+[shr-00081] For text-message invitation triage, use a broad deterministic candidate predicate: an extractable invitation code plus any of splitwise, invitation, invite, group, or join wording; do not require exact phrases such as both 'splitwise' and 'invitation'.
+## APIs TO USE FOR SPECIFIC INFORMATION
+[api-00004] You can use the "supervisor" app to get information about my accounts and use the "phone" app to get information about friends and family.
+
+[api-00012] simple_note.search_notes returns note metadata only (note_id, title, tags), not content; call simple_note.show_note to get content. venmo.search_users/search_friends return lists of user dicts containing email; venmo.create_transaction returns transaction_id and venmo.create_payment_request returns payment_request_id.
+[api-00015] venmo.show_transactions returns a list of dicts containing transaction_id, amount, description, private, sender.email, and receiver.email. venmo.show_sent_payment_requests returns a list of dicts containing payment_request_id, amount, description, private, sender.email, and receiver.email. Use these fields for deterministic duplicate and post-creation checks.
+[api-00017] phone.search_contacts is paginated and returns contact dicts with first_name, last_name, email, phone_number, and relationships; query may return unrelated family contacts, so collect all pages and filter exact first_name (and relationship only when the task justifies it). simple_note.show_note returns a dict containing 'content'; venmo.show_venmo_balance returns a dict containing 'venmo_balance'; venmo.create_transaction uses receiver_email and venmo.create_payment_request uses user_email, both accept private boolean with default false, so pass private=True for private payments/requests.
+[api-00023] file_system.login returns {'access_token': ...}; file_system.directory_exists and file_system.file_exists return {'exists': bool}; file_system.create_file accepts file_path with '~/...' or absolute path, content, overwrite default false, and returns {'message', 'file_path'}; file_system.show_file returns {'content': string}; supervisor.show_account_passwords returns list of dicts with account_name and password. simple_note.search_notes supports tags filter and returns metadata only; habit-tracker logs use tags=['habit-tracker'] and dates embedded in titles.
+[api-00029] file_system.login requires a username parameter whose meaning must be read from show_api_doc; do not assume it is the supervisor email. supervisor.show_account_passwords account_name values must be matched exactly (e.g., 'file_system', 'simple_note'). file_system.create_file may not create missing parent directories; if file_system.create_directory is available, use it after directory_exists returns false. file_system.directory_exists/file_exists return {'exists': bool}; file_system.create_file returns {'message', 'file_path'} and should be checked for expected file_path. simple_note.show_note returns a dict with title and content; use title for date extraction and content for habit parsing.
+[api-00034] file_system.create_file returns file_path as a normalized path, often absolute (e.g. /home/user/...), even when input file_path uses '~/...'. file_system.create_directory accepts recursive boolean; use recursive=True for nested parent directories. Derive parent_dir from the actual target with parent_dir=target.rsplit('/', 1)[0], not from an example path.
+[api-00040] Spotify playlist genre-title updates: supervisor.show_account_passwords returns a list of dicts with account_name and password; spotify.show_playlist_library returns playlist dicts with playlist_id/title/song_ids, but song_ids may be stale or incomplete; spotify.show_playlist returns detailed songs with id/title but not genre; spotify.show_song returns a dict containing genre; spotify.update_playlist accepts title and returns {'message': ...}. If song_ids are missing or suspect, use show_playlist to get authoritative song ids, then show_song for genres.
+[api-00044] Spotify canonical genres and ownership: spotify.show_genres returns the canonical genre domain; read show_api_doc for required parameters and normalize returned items to strings (e.g., strings or dicts with genre/name/title). spotify.show_playlist_library returns owner.email and playlist_id/title/song_ids; use owner.email to filter to supervisor-owned playlists when the task says 'my playlists'. spotify.show_song returns song_id and genre; normalize song ids to strings when building maps because ids may be returned as strings or integers.
+[api-00050] Spotify identifier types: show_playlist_library and show_playlist return playlist_id as integer; show_playlist.songs[].id and show_song.song_id are integers; update_playlist requires integer playlist_id. If you need string keys for song_genre, convert song ids to str consistently, but keep playlist_songs/expected keyed by int(p['playlist_id']) unless you intentionally store all playlist keys as str.
+[api-00055] venmo.search_friends returns a paginated list of dicts with first_name, last_name, email, registered_at, and friends_since (ISO datetime). It accepts page_index and page_limit (default 5, max 20); call with page_limit=20, loop until empty, and use friends_since for friendship-start time windows. Deduplicate by email because pages/queries may repeat users.
+[api-00063] phone.login requires username=supervisor phone_number and password; venmo.login requires username=supervisor email and password; both return {'access_token': string, 'token_type': string}. supervisor.complete_task accepts answer=<integer> for count tasks and returns a message; call show_api_doc for each before first use in the current task.
+[api-00071] phone.get_current_date_and_time returns {'date': human-readable date such as 'Thursday, May 18, 2023', 'time': '12:00 PM'}, not an ISO datetime; parse month/day/year from the date string. phone.search_text_messages returns paginated dicts with text_message_id, sender.phone_number, receiver.phone_number, message, and sent_at ISO datetime; query is fuzzy and may include sent messages, so enumerate no-query pages or merge keyword queries and filter direction. phone.show_text_message returns a dict for an existing message and raises 409 'The text message with id ... does not exist' for missing/deleted messages. splitwise.show_groups returns group dicts containing invitation_code; phone.search_contacts returns contact dicts with phone_number that should be normalized to digits for matching.
+[api-00076] phone.search_voice_messages returns paginated dicts with voice_message_id, sender.phone_number, receiver.phone_number, message, and sent_at ISO datetime; query is fuzzy and may include sent messages, so enumerate no-query pages and filter direction. phone.show_voice_message returns a dict for an existing voice message and raises an error containing 'does not exist' for missing/deleted messages; phone.delete_voice_message accepts voice_message_id and access_token and returns {'message': ...}. splitwise.accept_group_invitation accepts invitation_code and access_token and returns {'message': ...}. splitwise.show_groups accepts delete boolean (default false) and returns group dicts with invitation_code; fetch all pages and, when needed, also fetch deleted groups before deciding a code is absent.
+[api-00083] splitwise.login requires username=supervisor email and password and returns {'access_token': string, 'token_type': string}; splitwise.accept_group_invitation accepts invitation_code and access_token and returns {'message': string}; phone.delete_text_message accepts text_message_id and access_token and returns {'message': string}.
+## USEFUL CODE SNIPPETS AND TEMPLATES
+
+[code-00013] Initialize records=[]; then parse note debt lines:
+for line in content.splitlines():
+    if 'I owe' in line:
+        name = line.split('I owe')[1].split('=>')[0].strip()
+        amount = float(line.split('$')[1])
+        records.append({'name': name, 'amount': amount, 'direction': 'pay'})
+    elif 'owes me' in line:
+        name = line.split(' owes me')[0].strip()
+        amount = float(line.split('$')[1])
+        records.append({'name': name, 'amount': amount, 'direction': 'request'})
+[code-00016] Before creating Venmo payments/requests, build deterministic duplicate guards from paginated history:
+supervisor_email = 'alexander-ridd@gmail.com'  # replace with actual supervisor email
+existing_pay = {(t['receiver']['email'], int(round(float(t['amount']) * 100)), t['description']) for t in all_transactions if t['sender']['email'] == supervisor_email}
+existing_request = {(pr['receiver']['email'], int(round(float(pr['amount']) * 100)), pr['description']) for pr in all_requests}
+for r in records:
+    key = (r['email'], int(round(float(r['amount']) * 100)), 'For Athens trip')
+    if r['direction'] == 'pay' and key in existing_pay:
+        raise AssertionError('Duplicate payment exists')
+    if r['direction'] == 'request' and key in existing_request:
+        raise AssertionError('Duplicate request exists')
+After creation, fetch each returned transaction_id/payment_request_id and assert exact amount, receiver email, private == True, and description equals the task-specified note.
+[code-00018] Resolve contact emails deterministically with full pagination:
+for name in names:
+    candidates=[]; page_index=0
+    while True:
+        page=apis.phone.search_contacts(access_token=phone_access_token, query=name, page_index=page_index)
+        if not page: break
+        candidates.extend(page); page_index+=1
+    exact=[c for c in candidates if c.get('first_name','').lower()==name.lower()]
+    if require_friend:
+        exact=[c for c in exact if 'friend' in (c.get('relationships') or [])]
+    assert len(exact)==1, f'Expected exactly one contact for {name}, got {len(exact)}'
+    email_map[name]=exact[0]['email']
+[code-00027] Parse habit logs and build CSV without io:
+habit_logs=[]; page_index=0
+while True:
+    page=apis.simple_note.search_notes(access_token=sn_token, tags=['habit-tracker'], page_index=page_index)
+    if not page: break
+    habit_logs.extend(page); page_index+=1
+assert len({n['note_id'] for n in habit_logs}) == len(habit_logs)
+rows=[]; habit_order=None
+for n in habit_logs:
+    note=apis.simple_note.show_note(access_token=sn_token, note_id=n['note_id'])
+    date=note['title'].split()[-1]
+    p=date.split('-'); assert len(p)==3 and len(p[0])==4 and len(p[1])==2 and len(p[2])==2
+    habits={}; order=[]
+    for line in note['content'].splitlines():
+        line=line.strip()
+        if not line or line.startswith('#'): continue
+        assert ':' in line
+        k,v=line.split(':',1); v=v.strip().lower(); assert v in {'yes','no'}
+        habits[k]=v; order.append(k)
+    if habit_order is None: habit_order=order
+    else: assert order==habit_order
+    rows.append({'date':date,'habits':habits})
+rows.sort(key=lambda r:r['date'])
+assert len({r['date'] for r in rows})==len(rows)
+fields=['date']+habit_order
+assert all(',' not in f for f in fields)
+csv_content='\n'.join([','.join(fields)]+[','.join([r['date']]+[r['habits'][h] for h in habit_order]) for r in rows])+'\n'
+[code-00030] # Robust habit CSV export corrections (complements code-00027):
+def extract_date(title):
+    tokens=[]
+    for token in title.split():
+        t=token.strip('.,;:!?()[]{}')
+        parts=t.split('-')
+        if len(parts)==3 and all(p.isdigit() for p in parts) and len(parts[0])==4 and len(parts[1])==2 and len(parts[2])==2:
+            tokens.append(t)
+    assert len(tokens)==1, f'Expected exactly one yyyy-mm-dd date, got {tokens}'
+    return tokens[0]
+
+# When parsing lines, do not skip habit named Date unless value is a date/header:
+# if habit.lower()=='date' and value matches yyyy-mm-dd: continue
+
+# After habit_order is known, assert complete matrix and sort descending:
+for r in rows:
+    date=r['date']
+    assert set(r['habits'].keys()) == set(habit_order), f'Missing habits in {date}'
+rows.sort(key=lambda r: r['date'], reverse=True)
+
+# File-system preflight before create_file:
+parent_dir='~/backups'
+target='~/backups/habit_log.csv'
+print(apis.api_docs.show_api_doc(app_name='file_system', api_name='directory_exists'))
+dir_exists=apis.file_system.directory_exists(access_token=fs_token, directory_path=parent_dir)['exists']
+if not dir_exists:
+    fs_api_names=[d['name'] if isinstance(d, dict) else d for d in apis.api_docs.show_api_descriptions(app_name='file_system')]
+    if 'create_directory' in fs_api_names:
+        print(apis.api_docs.show_api_doc(app_name='file_system', api_name='create_directory'))
+        apis.file_system.create_directory(access_token=fs_token, directory_path=parent_dir)
+    else:
+        raise AssertionError('Missing parent directory and no create_directory API')
+assert apis.file_system.directory_exists(access_token=fs_token, directory_path=parent_dir)['exists']
+print(apis.api_docs.show_api_doc(app_name='file_system', api_name='file_exists'))
+overwrite=apis.file_system.file_exists(access_token=fs_token, file_path=target)['exists']
+print(apis.api_docs.show_api_doc(app_name='file_system', api_name='create_file'))
+created=apis.file_system.create_file(access_token=fs_token, file_path=target, content=csv_content, overwrite=overwrite)
+assert created.get('file_path') == target
+assert apis.file_system.file_exists(access_token=fs_token, file_path=target)['exists']
+[code-00036] # Corrected file-export path verification (replaces strict equality in code-00030):
+target='~/backups/simple_note/habits.csv'
+parent_dir=target.rsplit('/', 1)[0]
+if not apis.file_system.directory_exists(access_token=fs_token, directory_path=parent_dir)['exists']:
+    apis.file_system.create_directory(access_token=fs_token, directory_path=parent_dir, recursive=True)
+overwrite=apis.file_system.file_exists(access_token=fs_token, file_path=target)['exists']
+created=apis.file_system.create_file(access_token=fs_token, file_path=target, content=csv_content, overwrite=overwrite)
+canonical=created['file_path']
+assert canonical
+assert canonical == target or canonical.endswith(target[1:]) or canonical.endswith('backups/simple_note/habits.csv')
+assert apis.file_system.file_exists(access_token=fs_token, file_path=canonical)['exists']
+read_back=apis.file_system.show_file(access_token=fs_token, file_path=canonical)
+assert read_back['content'] == csv_content
+[code-00042] # Spotify playlist genre-title update (idempotent, deterministic tie-break, no Counter):
+def strip_known_genre_suffix(title, genres):
+    for g in genres:
+        suffix = ' | ' + g
+        if title.endswith(suffix):
+            return title[:-len(suffix)]
+    return title
+
+def genre_counts(song_ids, song_genre):
+    counts = {}
+    for sid in song_ids:
+        g = song_genre[int(sid)]
+        counts[g] = counts.get(g, 0) + 1
+    return counts
+
+def pick_genre(counts):
+    assert counts, 'Empty playlist has no most-common genre'
+    max_count = max(counts.values())
+    return sorted([g for g, c in counts.items() if c == max_count])[0]
+
+all_genres = set(song_genre.values())
+expected = {}
+for p in playlists:
+    song_ids = p.get('song_ids') or [s['id'] for s in apis.spotify.show_playlist(playlist_id=p['playlist_id'], access_token=spotify_access_token)['songs']]
+    genre = pick_genre(genre_counts(song_ids, song_genre))
+    base = strip_known_genre_suffix(p['title'], all_genres)
+    desired = f'{base} | {genre}'
+    expected[p['playlist_id']] = desired
+    if p['title'] == desired:
+        continue
+    res = apis.spotify.update_playlist(playlist_id=p['playlist_id'], access_token=spotify_access_token, title=desired)
+    assert res.get('message')
+
+# Re-fetch all pages and assert exact expected titles and no duplicate suffixes.
+[code-00046] # Spotify genre-title update hardening (complements code-00042):
+def normalize_genres(raw):
+    genres=set()
+    for item in raw:
+        if isinstance(item,str): genres.add(item)
+        elif isinstance(item,dict):
+            for key in ('genre','name','title'):
+                if key in item: genres.add(str(item[key])); break
+    return genres
+# After show_api_doc: canonical_genres = normalize_genres(apis.spotify.show_genres(...))
+# Build song_genre with normalized keys: song_genre[str(info['song_id'])] = info['genre']
+# Count with g = song_genre[str(sid)]
+# Strip suffix using canonical_genres, not observed genres only
+# Skip empty playlists: if not song_ids: continue
+# Assert owner: p['owner']['email'] == supervisor_email and unique playlist ids
+# After update: assert res.get('message'); re-fetch show_playlist and assert title == expected[pid]
+[code-00053] # Canonical Spotify key handling (complements code-00046; avoids code-00042 int/str mismatch):
+playlist_ids = [int(p['playlist_id']) for p in playlists]
+assert len(set(playlist_ids)) == len(playlist_ids)
+playlist_songs = {}
+for p in playlists:
+    pid = int(p['playlist_id'])
+    detail = apis.spotify.show_playlist(playlist_id=pid, access_token=spotify_access_token)
+    playlist_songs[pid] = [str(s['id']) for s in detail['songs']]
+song_genre = {}
+for sid in {sid for ids in playlist_songs.values() for sid in ids}:
+    info = apis.spotify.show_song(song_id=int(sid))
+    song_genre[str(info['song_id'])] = info['genre']
+expected = {}
+for p in playlists:
+    pid = int(p['playlist_id'])
+    ids = playlist_songs[pid]
+    if not ids:
+        continue
+    counts = {}
+    for sid in ids:
+        g = song_genre[sid]
+        counts[g] = counts.get(g, 0) + 1
+    max_count = max(counts.values())
+    genre = sorted([g for g, c in counts.items() if c == max_count])[0]
+    base = p['title']
+    while any(base.endswith(' | ' + g) for g in canonical_genres):
+        for g in canonical_genres:
+            if base.endswith(' | ' + g):
+                base = base[:-len(' | ' + g)]
+                break
+    expected[pid] = f'{base} | {genre}'
+assert set(expected.keys()) == set(playlist_songs.keys())
+[code-00056] # Robust Venmo friends-since count (set current_year only after corroborating it):
+friends=[]; seen_emails=set(); page_index=0
+while True:
+    page=apis.venmo.search_friends(access_token=venmo_access_token, page_index=page_index, page_limit=20)
+    if not page: break
+    for f in page:
+        email=f.get('email')
+        assert email and email not in seen_emails, f'Duplicate or missing friend email: {email}'
+        seen_emails.add(email)
+        friends.append(f)
+    page_index += 1
+
+def parse_iso_naive(ts):
+    date_part, time_part = ts.split('T')
+    y, m, d = map(int, date_part.split('-'))
+    h, mi, s = map(int, time_part.split(':'))
+    return (y, m, d, h, mi, s)
+
+parsed=[]
+for f in friends:
+    ts=f.get('friends_since')
+    assert ts
+    parsed.append(parse_iso_naive(ts))
+
+current_year = 2023  # replace with explicit/corroborated year
+cutoff = (current_year, 1, 1, 0, 0, 0)
+count = sum(1 for dt in parsed if dt >= cutoff)
+assert count == len([f for f in friends if parse_iso_naive(f['friends_since']) >= cutoff])
+[code-00062] # Robust Venmo friends since 'October last year' (complements code-00056):
+def parse_jwt_exp_date(access_token):
+    import base64, json, datetime
+    payload = access_token.split('.')[1]
+    payload += '=' * (-len(payload) % 4)
+    data = json.loads(base64.urlsafe_b64decode(payload.encode('ascii')).decode('utf-8'))
+    return datetime.datetime.utcfromtimestamp(int(data['exp']))
+
+# Prefer explicit date API if available; otherwise corroborate two fresh tokens.
+# If a second token/explicit date source is unavailable, stop rather than using max record timestamp.
+current_date = parse_jwt_exp_date(venmo_access_token)
+supervisor_phone_number = '7336094411'  # replace with actual supervisor phone
+phone_matches = [p for p in passwords if p.get('account_name') == 'phone']
+assert len(phone_matches) == 1
+# Before this call, show_api_doc for phone.login.
+phone_login = apis.phone.login(username=supervisor_phone_number, password=phone_matches[0]['password'])
+assert parse_jwt_exp_date(phone_login['access_token']).date() == current_date.date()
+
+venmo_matches = [p for p in passwords if p.get('account_name') == 'venmo']
+assert len(venmo_matches) == 1
+
+def parse_iso_naive(ts):
+    date_part, time_part = ts.split('T')
+    y, m, d = map(int, date_part.split('-'))
+    h, mi, s = map(int, time_part.split(':'))
+    return (y, m, d, h, mi, s)
+
+current_tuple = (current_date.year, current_date.month, current_date.day, 23, 59, 59)
+friends=[]; seen_emails=set(); page_index=0
+while True:
+    page=apis.venmo.search_friends(access_token=venmo_access_token, page_index=page_index, page_limit=20)
+    if not page: break
+    for f in page:
+        email=f.get('email'); ts=f.get('friends_since')
+        assert email and email not in seen_emails, f'Duplicate or missing friend email: {email}'
+        assert ts, f'Missing friends_since for {email}'
+        dt=parse_iso_naive(ts)
+        assert dt <= current_tuple, f'friends_since in future: {email}'
+        seen_emails.add(email); friends.append((email, dt))
+    page_index += 1
+
+cutoff = (current_date.year - 1, 10, 1, 0, 0, 0)
+answer = sum(1 for email, dt in friends if dt >= cutoff)
+assert answer == len({email for email, dt in friends if dt >= cutoff})
+[code-00068] # Robust Venmo friends since 'March this year' when base64/json may be blocked:
+def b64url_decode(s):
+    alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    lookup={c:i for i,c in enumerate(alphabet)}
+    bits=''
+    for c in s:
+        if c!='=':
+            bits += bin(lookup[c])[2:].zfill(6)
+    out=''
+    for i in range(0, len(bits)-7, 8):
+        out += chr(int(bits[i:i+8],2))
+    return out
+
+def jwt_exp_from_token(token):
+    payload=b64url_decode(token.split('.')[1])
+    idx=payload.find('exp')
+    assert idx != -1
+    num=''
+    for ch in payload[idx:]:
+        if ch.isdigit():
+            num += ch
+        elif num:
+            break
+    return int(num)
+
+# If datetime is available, use it; otherwise derive the date from corroborated Unix exps deterministically.
+import datetime
+current_date=datetime.datetime.utcfromtimestamp(jwt_exp_from_token(venmo_access_token))
+# Corroborate: assert datetime.datetime.utcfromtimestamp(jwt_exp_from_token(phone_access_token)).date() == current_date.date()
+cutoff_date=(current_date.year,3,1)
+friends=[]; seen=set(); page_index=0
+while True:
+    page=apis.venmo.search_friends(access_token=venmo_access_token, page_index=page_index, page_limit=20)
+    if not page: break
+    for f in page:
+        email=f.get('email'); ts=f.get('friends_since')
+        assert email and email not in seen and ts
+        date_part=ts.split('T')[0]
+        y,m,d=map(int,date_part.split('-'))
+        assert (y,m,d) <= (current_date.year,current_date.month,current_date.day)
+        seen.add(email); friends.append((email,(y,m,d)))
+    page_index+=1
+answer=sum(1 for email,dt in friends if dt >= cutoff_date)
+assert answer == len({email for email,dt in friends if dt >= cutoff_date})
+# apis.supervisor.complete_task(answer=answer)
+[code-00072] # Robust yesterday Splitwise invitation inbox triage template:
+def digits(s):
+    return ''.join(ch for ch in str(s) if ch.isdigit())
+
+def parse_human_date(date_str):
+    months={'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12}
+    parts=date_str.replace(',','').split()
+    assert len(parts)==4, parts
+    return int(parts[3]), months[parts[1]], int(parts[2])
+
+def parse_iso_date(ts):
+    y,m,d=map(int, ts.split('T')[0].split('-'))
+    return (y,m,d)
+
+def extract_code(msg):
+    low=msg.lower()
+    idx=low.find('code')
+    if idx == -1: return None
+    idx=low.find('=>', idx)
+    if idx == -1: return None
+    rest=low[idx+2:].strip()
+    if not rest: return None
+    token=rest.split()[0]
+    cleaned=''.join(ch for ch in token if ch.isalnum())
+    return cleaned or None
+
+def fetch_text_messages(query=None):
+    out=[]; seen=set(); page_index=0
+    while True:
+        if query is None:
+            page=apis.phone.search_text_messages(access_token=phone_access_token, page_index=page_index, page_limit=20)
+        else:
+            page=apis.phone.search_text_messages(access_token=phone_access_token, query=query, page_index=page_index, page_limit=20)
+        if not page: break
+        for m in page:
+            tid=m['text_message_id']
+            if tid not in seen:
+                seen.add(tid); out.append(m)
+        page_index += 1
+    return out
+
+import datetime
+current_date_tuple=parse_human_date(apis.phone.get_current_date_and_time()['date'])
+current_date=datetime.date(*current_date_tuple)
+yesterday=current_date - datetime.timedelta(days=1)
+yesterday_tuple=(yesterday.year, yesterday.month, yesterday.day)
+
+messages=fetch_text_messages()
+# If full enumeration is too large, also merge fetch_text_messages('splitwise') and fetch_text_messages('invitation') before filtering.
+supervisor_digits=digits(supervisor_phone_number)
+candidates=[]
+for m in messages:
+    ts=m.get('sent_at')
+    assert ts, m
+    dt=parse_iso_date(ts)
+    assert dt <= (current_date.year, current_date.month, current_date.day), m
+    if dt != yesterday_tuple: continue
+    if digits(m.get('receiver',{}).get('phone_number','')) != supervisor_digits: continue
+    if digits(m.get('sender',{}).get('phone_number','')) == supervisor_digits: continue
+    msg=m.get('message','').lower()
+    if 'splitwise' in msg and 'invitation' in msg:
+        code=extract_code(msg)
+        assert code, m
+        candidates.append((m['text_message_id'], digits(m['sender']['phone_number']), code))
+
+contact_digits=set(); page_index=0
+while True:
+    page=apis.phone.search_contacts(access_token=phone_access_token, query='', page_index=page_index, page_limit=20)
+    if not page: break
+    for c in page:
+        ph=digits(c.get('phone_number',''))
+        if ph: contact_digits.add(ph)
+    page_index += 1
+
+accept=[]; delete=[]
+for tid,sender_digits,code in candidates:
+    if sender_digits in contact_digits:
+        accept.append((tid,sender_digits,code))
+    else:
+        delete.append((tid,sender_digits,code))
+
+existing_codes=set(); page_index=0
+while True:
+    page=apis.splitwise.show_groups(access_token=splitwise_access_token, page_index=page_index, page_limit=20)
+    if not page: break
+    for g in page:
+        code=g.get('invitation_code')
+        if code: existing_codes.add(code)
+    page_index += 1
+
+for tid,sender_digits,code in accept:
+    if code in existing_codes: continue
+    res=apis.splitwise.accept_group_invitation(invitation_code=code, access_token=splitwise_access_token)
+    assert res.get('message'), res
+
+all_codes=set(); page_index=0
+while True:
+    page=apis.splitwise.show_groups(access_token=splitwise_access_token, page_index=page_index, page_limit=20)
+    if not page: break
+    for g in page:
+        code=g.get('invitation_code')
+        if code: all_codes.add(code)
+    page_index += 1
+for _,_,code in accept:
+    assert code in all_codes, code
+
+for tid,sender_digits,code in delete:
+    try:
+        apis.phone.show_text_message(text_message_id=tid, access_token=phone_access_token)
+    except Exception as e:
+        if 'does not exist' in str(e): continue
+        raise
+    res=apis.phone.delete_text_message(text_message_id=tid, access_token=phone_access_token)
+    assert res.get('message'), res
+
+for tid,_,_ in delete:
+    try:
+        apis.phone.show_text_message(text_message_id=tid, access_token=phone_access_token)
+        raise AssertionError('message still exists')
+    except Exception as e:
+        assert 'does not exist' in str(e), e
+
+for tid,_,_ in accept:
+    res=apis.phone.show_text_message(text_message_id=tid, access_token=phone_access_token)
+    assert res.get('text_message_id') == tid
+[code-00077] # Robust day-before-yesterday Splitwise voice invitation triage template:
+def digits(s):
+    return ''.join(ch for ch in str(s) if ch.isdigit())
+
+def parse_human_date(date_str):
+    months={'January':1,'February':2,'March':3,'April':4,'May':5,'June':6,'July':7,'August':8,'September':9,'October':10,'November':11,'December':12}
+    parts=date_str.replace(',','').split()
+    assert len(parts)==4, parts
+    return int(parts[3]), months[parts[1]], int(parts[2])
+
+def parse_iso_datetime(ts):
+    date_part, time_part = ts.split('T')
+    y,m,d = map(int, date_part.split('-'))
+    time_part = time_part.split('+')[0].split('Z')[0].split('.')[0]
+    h,mi,s = map(int, time_part.split(':'))
+    return (y,m,d,h,mi,s)
+
+def extract_code(msg):
+    low=msg.lower()
+    idx=low.find('code')
+    if idx == -1: return None
+    idx=low.find('=>', idx)
+    if idx == -1: return None
+    rest=low[idx+2:].strip()
+    if not rest: return None
+    token=rest.split()[0]
+    cleaned=''.join(ch for ch in token if ch.isalnum())
+    return cleaned or None
+
+def is_invitation_candidate(msg):
+    low=msg.lower()
+    code=extract_code(low)
+    if not code: return False
+    return any(k in low for k in ('splitwise','invitation','invite','group','join'))
+
+import datetime
+current_date_tuple=parse_human_date(apis.phone.get_current_date_and_time()['date'])
+current_date=datetime.date(*current_date_tuple)
+target_date=current_date - datetime.timedelta(days=2)
+target_tuple=(target_date.year, target_date.month, target_date.day)
+
+messages=[]; seen_ids=set(); page_index=0
+while True:
+    page=apis.phone.search_voice_messages(access_token=phone_access_token, page_index=page_index, page_limit=20)
+    if not page: break
+    for m in page:
+        vid=m['voice_message_id']
+        if vid not in seen_ids:
+            seen_ids.add(vid); messages.append(m)
+    page_index += 1
+
+supervisor_digits=digits(supervisor_phone_number)
+received=[]
+for m in messages:
+    ts=m.get('sent_at'); assert ts, m
+    dt=parse_iso_datetime(ts)
+    assert dt[:6] <= (current_date.year,current_date.month,current_date.day,23,59,59), m
+    if dt[:3] != target_tuple: continue
+    if digits(m.get('receiver',{}).get('phone_number','')) != supervisor_digits: continue
+    if digits(m.get('sender',{}).get('phone_number','')) == supervisor_digits: continue
+    received.append(m)
+
+candidates=[]; ignored=[]
+for m in received:
+    code=extract_code(m['message'])
+    if code and is_invitation_candidate(m['message']):
+        candidates.append((m['voice_message_id'], digits(m['sender']['phone_number']), code))
+    else:
+        ignored.append(m['voice_message_id'])
+assert len(candidates)+len(ignored)==len(received)
+
+contact_digits=set(); page_index=0
+while True:
+    page=apis.phone.search_contacts(access_token=phone_access_token, query='', page_index=page_index, page_limit=20)
+    if not page: break
+    for c in page:
+        ph=digits(c.get('phone_number',''))
+        if ph: contact_digits.add(ph)
+    page_index += 1
+
+accept_messages=[]; accept_codes=[]; seen_accept_codes=set(); delete=[]
+for vid,sndr,code in candidates:
+    if sndr in contact_digits:
+        accept_messages.append(vid)
+        if code not in seen_accept_codes:
+            seen_accept_codes.add(code); accept_codes.append((vid,sndr,code))
+    else:
+        delete.append((vid,sndr,code))
+
+def fetch_group_codes(include_deleted=False):
+    codes=set(); page_index=0
+    while True:
+        page=apis.splitwise.show_groups(access_token=splitwise_access_token, page_index=page_index, page_limit=20, delete=include_deleted)
+        if not page: break
+        for g in page:
+            code=g.get('invitation_code')
+            if code: codes.add(code)
+        page_index += 1
+    return codes
+
+existing_codes=fetch_group_codes(False)
+# If a code is not in active groups, optionally check deleted groups before deciding it is absent:
+# existing_codes.update(fetch_group_codes(True))
+
+accepted_this_run=set()
+for vid,sndr,code in accept_codes:
+    if code in existing_codes or code in accepted_this_run:
+        continue
+    res=apis.splitwise.accept_group_invitation(invitation_code=code, access_token=splitwise_access_token)
+    assert res.get('message'), res
+    accepted_this_run.add(code)
+
+all_codes=fetch_group_codes(False)
+for _,_,code in accept_codes:
+    assert code in all_codes or code in accepted_this_run, code
+
+for vid,sndr,code in delete:
+    try:
+        apis.phone.show_voice_message(voice_message_id=vid, access_token=phone_access_token)
+    except Exception as e:
+        if 'does not exist' in str(e): continue
+        raise
+    res=apis.phone.delete_voice_message(voice_message_id=vid, access_token=phone_access_token)
+    assert res.get('message'), res
+
+for vid,_,_ in delete:
+    try:
+        apis.phone.show_voice_message(voice_message_id=vid, access_token=phone_access_token)
+        raise AssertionError('voice message still exists')
+    except AssertionError:
+        raise
+    except Exception as e:
+        assert 'does not exist' in str(e), e
+
+for vid in accept_messages:
+    res=apis.phone.show_voice_message(voice_message_id=vid, access_token=phone_access_token)
+    assert res.get('voice_message_id') == vid
+
+for vid in ignored:
+    res=apis.phone.show_voice_message(voice_message_id=vid, access_token=phone_access_token)
+    assert res.get('voice_message_id') == vid
+
+# apis.supervisor.complete_task()  # action task: no answer
+[code-00084] # This-week text invitation triage corrections (complements code-00072):
+import datetime
+current_date_tuple=parse_human_date(apis.phone.get_current_date_and_time()['date'])
+current_date=datetime.date(*current_date_tuple)
+start_of_week=current_date - datetime.timedelta(days=current_date.weekday())
+# When building candidates, keep only start_of_week <= parse_iso_date(m['sent_at']) <= current_date.
+# Replace narrow filter with:
+def is_invitation_candidate(msg):
+    low=msg.lower()
+    code=extract_code(low)
+    return bool(code) and any(k in low for k in ('splitwise','invitation','invite','group','join'))
+# Derive irreversible lists programmatically:
+accept=[c for c in candidates if c[1] in contact_digits]
+delete=[c for c in candidates if c[1] not in contact_digits]
+assert len(accept)+len(delete)==len(candidates)
+## COMMON MISTAKES AND CORRECT STRATEGIES
+
+[cms-00010] Never rely on manually reading printed note output to extract names/amounts; parse note content programmatically into structured records (name, amount, direction) and validate that every parsed record is accounted for before creating transactions.
+[cms-00019] If a programmatic parser returns empty or fewer records than expected, treat it as a parsing failure and debug deterministically: inspect repr(content), normalize line endings/whitespace, test extraction line-by-line, and assert the expected record count. Never manually read printed output to fill in missing values for irreversible actions.
+[cms-00026] Never manually join CSV rows without checking delimiter safety; if any habit/date field may contain a comma, implement CSV quoting manually or assert none do. Never silently ignore malformed note lines; assert every non-empty non-header line parses into a habit and a yes/no value.
+[cms-00031] Do not drop a real habit named 'Date' merely because its key is date; skip only header/metadata lines when the value is a date or the line is clearly a title. Do not take the first/last yyyy-mm-dd token; scan all tokens and assert exactly one. Do not build CSV rows until every note contains all habit_order keys; otherwise missing habits cause KeyError or blank cells.
+[cms-00041] When parsing indented note lines, do not strip leading whitespace and then match the original indentation prefix, e.g. line.strip().startswith(' - '); preserve the raw line or match line.lstrip().startswith('-')/regex. If a parser returns empty or fewer records than expected, debug and assert expected records before any irreversible send or update.
+[cms-00047] Do not build genre-suffix stripping from only genres present in current playlist songs; a stale suffix with a genre absent from the playlist can survive and create double suffixes. Do not assume song ids are integers; normalize ids to strings consistently. Do not update playlists whose owner email is not the supervisor, and do not leave empty playlists undefined.
+[cms-00051] KeyError '608' can occur when playlist_songs is keyed by integer playlist_id but later looked up with str(p['playlist_id']). Use one canonical key type and assert all lookup keys exist before irreversible updates. Also avoid debug count dict comprehensions like {g: ids.count(sid) ...} that overwrite repeated genre keys and count song occurrences instead of genre occurrences; use the same explicit counts.get loop or helper function used for final genre selection.
+[cms-00057] Do not count time-window records by comparing only the first 10 characters of friends_since without validating that every value parses as ISO datetime; do not infer 'this year' from a single JWT exp timestamp when record timestamps disagree or when an explicit date source is available; do not count duplicate friend emails returned by paginated/search APIs.
+[cms-00060] Do not silently drop Venmo friend records with missing/duplicate emails or missing friends_since; assert every returned friend has a non-empty unique email and a valid friends_since. Do not assume supervisor.show_account_passwords has exactly one venmo entry; filter by exact account_name and assert len(matches)==1 before login. Do not manually decode/eyeball JWT exp; parse it programmatically or use an explicit date API.
+[cms-00065] Do not select credentials with next(...) or next(..., None); it can silently choose the first/missing entry. Use matches = [p for p in passwords if p.get('account_name') == app_name], assert len(matches) == 1, then use matches[0]['password']; if zero or multiple, stop rather than guessing.
+[cms-00073] For inbox invitation tasks, do not use query='splitwise' or query='invitation' as the complete inventory; fuzzy query may miss differently worded invitations and may include sent messages. Do not hardcode exactly one accept and one delete; process all classified candidates. Do not compare sent_at with startswith('YYYY-MM-DD') without validating the full ISO timestamp; do not exact-match phone numbers without normalizing digits. Do not delete accepted invitation messages unless the task explicitly says to delete them. Do not treat phone.show_text_message 409 'does not exist' as an unexpected failure when it is the expected post-deletion verification.
+[cms-00082] Do not skip show_api_doc for verification APIs such as phone.show_text_message or phone.show_voice_message; first use includes pre-deletion existence checks and post-deletion absence checks, even when the API is only used to verify an irreversible action.
+## PROBLEM-SOLVING HEURISTICS AND WORKFLOWS
+[psw-00002] Remember you can use the variables in your code in subsequent code blocks.
+[psw-00007] Many APIs return items in "pages". Make sure to run through all the pages by looping over `page_index`.
+
+## VERIFICATION CHECKLIST
+
+[vc-00011] Before creating Venmo payments/requests, list existing transactions and sent payment requests to check for matching recipient, amount, and description; after creation, store returned transaction_id/payment_request_id and verify them with show_transaction/show_transactions or show_sent_payment_requests, including privacy flag and exact task-specified description.
+[vc-00021] Before first use of each API name in a session, call show_api_doc for that exact API, including read-only APIs such as simple_note.show_note and venmo.show_venmo_balance. After creating Venmo transactions/requests, re-fetch each returned transaction_id/payment_request_id and assert sender email, receiver email, amount in cents, private flag, and exact description.
+[vc-00024] When exporting note logs to CSV, assert: all source notes retrieved by authoritative tag filter with unique note_ids; exactly one valid yyyy-mm-dd date per note title; every non-empty non-header line contains ':' and a yes/no value; habit names/order are identical across notes; row count equals note count; dates are unique and sorted ascending; no field contains a comma unless CSV quoting is implemented; and file_system.show_file content exactly equals csv_content.
+[vc-00025] Do not skip show_api_doc for any API name, including supervisor.show_account_passwords, supervisor.complete_task, file_system.directory_exists, file_system.file_exists, and file_system.show_file; even read-only or no-parameter APIs need docs before first use.
+[vc-00032] For habit CSV export, additionally assert: rows sorted descending by date from top to bottom; each source note's tags include 'habit-tracker'; row count equals note count; parent directory exists or was created; target file exists after create_file; create_file returned expected file_path; and file_system.show_file content exactly equals csv_content.
+[vc-00035] After create_file, assert created['file_path'] is non-empty and matches the intended file by suffix or normalized equivalence, not exact tilde-string equality. Re-check file_exists and read back show_file using the returned canonical path, optionally also checking the input path. For CSV export, assert the row order exactly matches the task's requested sort direction, e.g. ascending dates if the task says ascending, overriding template defaults.
+[vc-00043] For bulk title/field updates, assert: all source records are paginated; every needed detail is fetched from authoritative APIs; desired values are computed with a deterministic tie-break; current titles do not already contain duplicate suffixes; update calls are skipped when current value already equals desired; and re-fetched records exactly match the expected mapping.
+[vc-00048] For Spotify playlist genre-title updates, additionally assert: supervisor-owned playlists only; unique playlist ids; canonical genre list fetched; song ids normalized; empty playlists skipped or explicitly handled; update_playlist response contains message; and re-fetched show_playlist titles exactly match expected mapping, not only show_playlist_library.
+[vc-00052] Before bulk Spotify title updates, assert: playlist ids are unique and all stored as the same type used for lookup, e.g. int; expected mapping keys exactly match {int(p['playlist_id']) for p in playlists}; every playlist_songs key exists; genre counts are computed by the same deterministic helper used for final selection; and no current title already contains a canonical genre suffix unless intentionally stripped.
+[vc-00058] For 'since start of January this year' counts, assert: all friend pages fetched until empty; every friend has a unique email and a valid friends_since; the current year is established from an explicit date source or corroborated by at least two independent timestamps; the cutoff is datetime(current_year,1,1); and the returned answer equals the number of unique parsed friends_since values >= cutoff.
+[vc-00061] For 'How many venmo friends have I made since the start of October last year?', assert: exactly one venmo password; venmo.search_friends all pages until empty; unique non-empty emails; valid friends_since used for the window (not registered_at); current_date from explicit date API or programmatic token exp(s), not max record; cutoff = datetime(current_date.year - 1, 10, 1); all friends_since <= current_date; answer equals count of unique friend emails with friends_since >= cutoff; return integer via complete_task(answer=count).
+[vc-00066] For 'since the start of March this year' Venmo friend counts, assert: current_date is corroborated by at least two independent JWT exp claims with the same calendar date (not merely the same year); cutoff is (current_date.year, 3, 1); compare friends_since by validated date parts (y, m, d) >= cutoff to avoid timezone/midnight fragility; every friend has unique non-empty email and valid friends_since; all friends_since <= current_date; and answer == len({email for email, dt_date in parsed if dt_date >= cutoff}).
+[vc-00074] For yesterday Splitwise invitation accept/delete tasks, assert: current date parsed from phone.get_current_date_and_time and yesterday computed; all relevant received messages enumerated/deduplicated by text_message_id; direction filter receiver.phone_number == supervisor and sender != supervisor; every candidate sent_at parses as ISO and is not future; every candidate has an extractable invitation code; contacts are fully paginated and normalized to digits; accept/delete lists cover all candidates; splitwise.show_groups precheck skips existing codes; accepted codes appear after re-fetch; deleted messages are absent via 409 and accepted messages remain.
+[vc-00078] For day-before-yesterday Splitwise voice invitation accept/delete tasks, assert: current date parsed from phone.get_current_date_and_time and target_date=current_date-2; all voice messages enumerated/deduplicated by voice_message_id; direction filter receiver=supervisor and sender!=supervisor; every target-date received message is classified as invitation candidate or explicitly ignored; every candidate has extractable code; accept actions are deduplicated by invitation_code and skip existing/already-accepted codes; accepted codes appear after re-fetch; deleted voice messages are absent via show_voice_message; accepted invitation voice messages and ignored non-invitation voice messages remain; complete_task is called without answer.
+## TROUBLESHOOTING AND PITFALLS:
+
+[ts-00067] Do not assume base64/json are available in the execution environment; they may be blocked. If base64 is blocked, decode JWT payload with pure string operations or extract the exp integer directly from the decoded payload; prefer deterministic pure-Python parsing over module imports that can fail.
+## OTHERS
+[misc-00003] Remember that the email addresses, access tokens and variables (e.g. spotify_password) in the example above are not valid anymore.
+[misc-00008] Once you have completed the task, make sure to call apis.supervisor.complete_task(). If the task asked for some information, return it as the answer argument, i.e. call apis.supervisor.complete_task(answer=<answer>). Many tasks do not require an answer, so in those cases, just call apis.supervisor.complete_task() i.e. do not pass any argument.

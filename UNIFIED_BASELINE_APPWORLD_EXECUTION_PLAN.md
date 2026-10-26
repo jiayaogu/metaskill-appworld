@@ -431,7 +431,7 @@ Replace `PILOT_TASK_IDS` as the source of task order in `polyskill/appworld/runn
 
 ### ReMe `baseline_config`
 
-Example ReMe block: shared `baseline: reme`, `dataset_name: 18_task_online_no_gt_pilot`, `experiment_name: reme_18_task_online_no_gt_pilot_online_adaptation_qwen3.8-flash`, `evaluation.dataset_output_name: 18_task_online_no_gt_pilot`, `appworld.random_seed: 1729`, `appworld.max_interactions: 30`, `appworld.raise_on_unsafe_syntax: true`, `appworld.raise_on_failure: false`. Substitute any registered dataset name and regenerate both names. The baseline being preserved is the existing **ReMe AppWorld pilot method**, not an unused native `AgentWrapper` or a newly invented ReMe Job sequence:
+Example ReMe block: shared `baseline: reme`, `dataset_name: 18_task_online_no_gt_pilot`, `experiment_name: reme_18_task_online_no_gt_pilot_online_adaptation_qwen3.8-flash`, `evaluation.dataset_output_name: 18_task_online_no_gt_pilot`, `appworld.random_seed: 1729`, `appworld.max_interactions: 30`, `appworld.raise_on_unsafe_syntax: true`, `appworld.raise_on_failure: false`. Substitute any registered dataset name and regenerate both names. Keep the existing ReMe AppWorld task sequence and memory operations, with the requested stream-wide memory scope:
 
 ```yaml
 baseline_config:
@@ -451,7 +451,7 @@ baseline_config:
     delete_alpha: 5
     delete_beta: 0.5
     success_only_update: true
-    family_local: true
+    family_local: false
   execution:
     outer_max_steps: 30
     executor_timeout_seconds: 240
@@ -461,7 +461,7 @@ baseline_config:
     require_usage_sidecar: true
 ```
 
-`common/baselines/reme_adapter.py` invokes `ReMe/scripts/appworld_unified_core.py` once per task. Its `_memory_pre` and `_memory_post` functions live in `ReMe/scripts/appworld_memory_core.py`; they were extracted unchanged from the former study harness (19 relevant function ASTs matched during cleanup). `appworld_episode_bridge.run_episode()` keeps its executor-turn loop and requires the shared `EpisodeService`; its separate AppWorld constructor, standalone pilot CLI, and incompatible `metaskill-` experiment-name requirement were removed. Preserve the original **memory-pre → executor turns / `world.execute` → completion → official evaluation → memory-post** order. The shared task loader alone selects IDs; fixed-task/multi-arm schedulers, qualification, oracle, public-context export, and synthetic AppWorld output exporters were removed from the active ReMe source tree. Family-local checkpoint position is the encounter order within the selected dataset. The memory values above are fixed original pilot invariants; reject drift rather than silently changing them. The existing executor JSON decoding/repair and prompt templates remain in the baseline wrapper. `appworld_openai_wrapper.py` and `appworld_reme_bridge.py` retain provider calls and delegate each physical call to the shared task logger through the subprocess environment. Baseline artifacts are sidecars only; existing historical experiment outputs were not changed.
+`common/baselines/reme_adapter.py` invokes `ReMe/scripts/appworld_unified_core.py` once per task. Its `_memory_pre` and `_memory_post` functions live in `ReMe/scripts/appworld_memory_core.py`; they were extracted unchanged from the former study harness (19 relevant function ASTs matched during cleanup). `appworld_episode_bridge.run_episode()` keeps its executor-turn loop and requires the shared `EpisodeService`; its separate AppWorld constructor, standalone pilot CLI, and incompatible `metaskill-` experiment-name requirement were removed. Preserve the **memory-pre → executor turns / `world.execute` → completion → official evaluation → memory-post** order. The shared task loader alone selects IDs; fixed-task/multi-arm schedulers, qualification, oracle, public-context export, and synthetic AppWorld output exporters were removed from the active ReMe source tree. For online adaptation, use one memory store and checkpoint chain per dataset run. At task position `i`, retrieval searches all experiences committed by positions `< i`, regardless of family; task `i` updates the store only after its official evaluation. Store each experience's source task and commit position, and reject any retrieval from the current or a future task. Keep the other memory parameters above fixed. The current adapter still rejects `family_local: false`, and the core still creates per-family checkpoints, so this planned scope requires implementation and cross-family retrieval tests before scored runs. The existing executor JSON decoding/repair and prompt templates remain in the baseline wrapper. `appworld_openai_wrapper.py` and `appworld_reme_bridge.py` retain provider calls and delegate each physical call to the shared task logger through the subprocess environment. Baseline artifacts are sidecars only; existing historical experiment outputs were not changed.
 
 ## 5. Config compilation and validation
 
@@ -481,7 +481,7 @@ Expose `validate-config`, `run`, `evaluate`, and `validate-output` in `common/cl
 
 1. Implement the shared ports, logger, config compiler, and output validator. Capture one ACE task and aggregate evaluation as golden fixtures.
 2. Inject ports into ACE `StarAgent` and its role generators. Compare legacy and shared ordered traces, final DB hashes, official scores, playbook updates, and task LLM records. Do not change ACE prompts or control flow in this step.
-3. Migrate ReasoningBank, PolySkill, then ReMe. For each, run one fixed task and one small registered dataset with a complete three-task family. Compare legacy and shared execution/evaluation/memory event order and official TGC/SGC.
+3. Migrate ReasoningBank, PolySkill, then ReMe. For each, run one fixed task and one small registered dataset with a complete three-task family. For ReMe, include at least two families and verify that a later family can retrieve an earlier family's committed experience. Compare legacy and shared execution/evaluation event order and official TGC/SGC; document the expected memory difference from the requested scope change.
 4. Add replay and retry cases. Verify PolySkill replay AppWorld artifacts use an auxiliary experiment while all replay LLM records remain in the primary task's file. Verify ReMe chat, repair, memory, and embedding subprocess calls all write to that same task file.
 5. Add resume checks at each baseline's native durable update boundary. Interrupt a run, resume, and verify task order, memory state, physical call IDs, and cost records are not duplicated.
 6. ReMe's duplicate study construction, output mirroring, and synthetic file exporters have been removed from the active source tree after mechanically extracting its memory methods; preserve baseline-owned reasoning and memory loops. For other baselines, remove such duplicate code only after parity passes.

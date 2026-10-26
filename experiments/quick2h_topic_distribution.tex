@@ -1,0 +1,267 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{tabularx}
+
+\title{AppWorld Topic Distributions and Scenario Samples}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Train and test topic distributions}
+
+An AppWorld scenario is a family of three task variants sharing an ID prefix.
+The full train, normal-test, and challenge-test splits contain 30, 56, and 139
+scenarios, respectively. We describe task content using ten instruction-derived
+topics: Amazon, Gmail, Todoist, Splitwise, Spotify, Venmo, Simple Note, Phone,
+File system, and Other. App topics require an explicit app mention; Phone and
+File system also use corresponding instruction references. An instruction
+without any of these tags is assigned Other. This is a coarse description of
+task content: for example, an email task that does not explicitly mention
+Gmail may be tagged Other.
+
+Each scenario has total weight one. Its three variants each contribute one
+third of that weight, divided equally among all topics tagged in that
+variant. Let \(T_{s,v}\) be the set of tags in variant \(v\) of scenario \(s\).
+For a split \(G\), the topic probability is
+\begin{equation}
+  p_{G,k}
+  = \frac{1}{|G|}
+    \sum_{s\in G}\frac{1}{3}
+    \sum_{v=1}^{3}
+    \frac{\mathbf{1}\{k\in T_{s,v}\}}{|T_{s,v}|},
+  \qquad
+  \sum_{k=1}^{10}p_{G,k}=1.
+  \label{eq:topic-distribution}
+\end{equation}
+
+The indicator \(\mathbf{1}\{k\in T_{s,v}\}\) is one if topic \(k\) is
+tagged in that variant and zero otherwise. The denominator
+\(|T_{s,v}|\) is the number of tags in the variant; it is at least one
+because an untagged instruction receives Other. For example, if
+\(T_{s,v}=\{\text{Spotify}\}\), the fraction is one for Spotify and zero
+for every other topic. If \(T_{s,v}=\{\text{Spotify},\text{Phone}\}\), it is
+\(1/2\) for each of those two topics and zero for the rest. That variant
+therefore contributes \((1/3)(1/2)=1/6\) of its scenario's weight to each
+topic, before averaging over the \(|G|\) scenarios.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Topic probabilities in the full splits, quick2h samples (five
+scenarios per split), and intermediate samples (10 train, 19 normal, and 46
+challenge scenarios). Each column sums to 100\% before rounding.}
+\label{tab:topic-probabilities}
+\begin{tabular}{lrrr@{\hspace{10pt}}rrr@{\hspace{10pt}}rrr}
+\toprule
+Topic & \multicolumn{3}{c}{Train} & \multicolumn{3}{c}{Test normal}
+      & \multicolumn{3}{c}{Test challenge} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+ & Full & Quick2h & Intermediate & Full & Quick2h & Intermediate
+ & Full & Quick2h & Intermediate \\
+\midrule
+Amazon      & 0.00\%  & 0.00\%  & 0.00\%  & 0.00\%  & 0.00\%  & 0.00\%  & 43.65\% & 43.33\% & 44.20\% \\
+Gmail       & 0.00\%  & 0.00\%  & 0.00\%  & 0.00\%  & 0.00\%  & 0.00\%  & 11.87\% & 10.00\% & 11.96\% \\
+Todoist     & 0.00\%  & 0.00\%  & 0.00\%  & 3.57\%  & 0.00\%  & 2.63\%  & 0.72\%  & 0.00\%  & 0.00\% \\
+Splitwise   & 0.00\%  & 0.00\%  & 0.00\%  & 3.57\%  & 10.00\% & 5.26\%  & 1.08\%  & 0.00\%  & 1.09\% \\
+Spotify     & 50.00\% & 50.00\% & 50.00\% & 21.43\% & 20.00\% & 21.05\% & 6.35\%  & 6.67\%  & 5.80\% \\
+Venmo       & 20.00\% & 20.00\% & 20.00\% & 34.52\% & 30.00\% & 34.21\% & 7.19\%  & 10.00\% & 7.61\% \\
+Simple Note & 8.33\%  & 10.00\% & 5.00\%  & 18.75\% & 20.00\% & 18.42\% & 3.24\%  & 0.00\%  & 3.26\% \\
+Phone       & 8.33\%  & 0.00\%  & 10.00\% & 9.23\%  & 10.00\% & 10.53\% & 6.83\%  & 0.00\%  & 6.52\% \\
+File system & 13.33\% & 20.00\% & 15.00\% & 7.14\%  & 10.00\% & 7.89\%  & 10.43\% & 10.00\% & 10.87\% \\
+Other       & 0.00\%  & 0.00\%  & 0.00\%  & 1.79\%  & 0.00\%  & 0.00\%  & 8.63\%  & 20.00\% & 8.70\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In the full splits, normal test has relatively more Venmo and Simple Note
+content and introduces Todoist and Splitwise topics. Challenge test has
+substantial Amazon and Gmail content, both absent from the training
+instructions under these tags.
+
+\section{Total variation distance}
+
+For two topic distributions \(P=(p_1,\ldots,p_{10})\) and
+\(Q=(q_1,\ldots,q_{10})\), total variation (TV) distance is
+\begin{equation}
+  \operatorname{TV}(P,Q)
+  = \frac{1}{2}\sum_{k=1}^{10}|p_k-q_k|.
+  \label{eq:tv}
+\end{equation}
+The factor \(1/2\) keeps the result between zero and one. A value of
+\(0\) means the two distributions assign exactly the same probability to
+every \emph{measured topic}; their individual tasks need not be identical.
+A value of \(1\) means the distributions have disjoint topic support:
+no measured topic has positive probability in both. Equivalently, TV is
+the minimum fraction of topic probability mass that must be reassigned to
+make the distributions match.
+
+Applying Eq.~\eqref{eq:tv} to the full-split proportions in
+Table~\ref{tab:topic-probabilities} gives
+\begin{align}
+  \operatorname{TV}(P_{\mathrm{train}},P_{\mathrm{normal}})
+    &= \tfrac{1}{2}(0.695238)=\mathbf{0.347619}, \\
+  \operatorname{TV}(P_{\mathrm{train}},P_{\mathrm{challenge}})
+    &= \tfrac{1}{2}(1.318945)=\mathbf{0.659472}.
+\end{align}
+These calculations use the unrounded probabilities; the displayed topic
+percentages are rounded to two decimal places. The challenge split is
+therefore much farther from train on this topic representation than normal
+test is.
+
+\section{Two-hour sampling methods}
+
+\paragraph{Quick2h sample.}
+From each source split, select five complete scenarios and retain all three
+variants of each scenario: 15 scenarios and 45 tasks overall. Selection
+balances the split's instruction-derived topic mix, task difficulty, and number
+of apps. The normal and challenge samples also span different levels of
+instruction similarity to training scenarios and include test content absent
+from train. At the pilot estimate of 2.2 minutes per task, 45 tasks take about
+99 minutes.
+
+\paragraph{Conditioned sample.}
+Select five complete scenarios per split under an additional memory-pressure
+eligibility requirement. Each family is scored from its task variants and
+evaluator conditions on memory structure (M), retrieval (I), adaptation (A),
+evidence sampling (P), and memory update (U), with scores in
+\(\{0,1,2\}\). A family is eligible only if all five scores are at least
+one. Among reviewed eligible families, selection aims to retain each original
+split's topic mix, difficulty, app count, and test novelty mix. Baseline
+success or failure is not used as a screening criterion. The resulting
+15 scenarios again contain 45 tasks. Conditioning and the five-scenario
+budget can change the observed topic proportions, so neither sample is an
+unbiased estimate of full-split performance.
+
+\subsection{Reusable total-variation-preserving selection criteria}
+
+For a new sample, fix the source splits and topic rule, then select complete
+three-task families within the budget. The ordinary pool is each full split;
+the conditioned pool contains families passing all five tests in
+Table~\ref{tab:memory-pressure-tests}. In both cases, compare each sample
+against its \emph{full} source split for topic, difficulty, app-count, and
+test-novelty-bin TV. Also compare each sampled train-to-test topic TV with its
+full-split counterpart: for \(t\in\{\mathrm{normal},\mathrm{challenge}\}\),
+\(\delta_t=|\operatorname{TV}(P_{S_{\mathrm{train}}},P_{S_t})-
+\operatorname{TV}(P_{F_{\mathrm{train}}},P_{F_t})|\), where \(F\) denotes a
+full split and \(S\) its sample. Prefer small \(\delta_t\), retain the
+challenge-greater-than-normal ordering and test-only app content where
+feasible, and report any mismatch after conditioning. Detailed criteria and
+audit fields are in \texttt{samples/memory\_pressure\_screening.md}.
+
+\clearpage
+\subsection{Memory-pressure scoring tests}
+
+Table~\ref{tab:memory-pressure-tests} converts the reusable conditioned-sample
+screening rubric into score definitions. M, I, A, P, and U denote memory
+structure, retrieval, adaptation, evidence sampling, and memory update.
+Inspect all three variants and intrinsic evaluator conditions together. Each
+dimension receives exactly one score from \(\{0,1,2\}\), supported by a
+concrete family observation and a one-sentence justification.
+
+\begin{table}[htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.22}
+\caption{Memory-pressure scoring tests used by the conditioned sample.}
+\label{tab:memory-pressure-tests}
+\begin{tabularx}{\textwidth}{@{}c
+  >{\raggedright\arraybackslash}X
+  >{\raggedright\arraybackslash}X
+  >{\raggedright\arraybackslash}X@{}}
+\toprule
+Mode & Score = 0 & Score = 1 & Score = 2 \\
+\midrule
+\textbf{M}
+  & No meaningful reusable procedure, or variants are essentially identical.
+  & Variants share a procedure but differ in a task-specific binding, entity, condition, threshold, or object set.
+  & Score 1 holds, and transferring a variant-specific detail could cause an error; reusable invariants must be separated from scoped details. \\
+\addlinespace
+\textbf{I}
+  & Only one obvious reusable procedure is needed, with no meaningful competing memories.
+  & Multiple relevant reusable rules are needed, or plausible but inapplicable distractor rules exist.
+  & Multiple relevant rules must be retrieved jointly and plausible distractors exist; missing or misretrieving one changes the procedure. \\
+\addlinespace
+\textbf{A}
+  & A retrieved generic rule can be executed almost directly.
+  & At least one non-trivial task-specific binding, filter, entity resolution, or ordered action is required.
+  & At least two non-trivial operations must be composed, such as predicates, set operations, aggregation, dependencies, an output contract, or a postcondition check. \\
+\addlinespace
+\textbf{P}
+  & Failure feedback is binary or ambiguous and cannot provide a useful diagnosis.
+  & Evaluator or trajectory evidence localizes a failure and supports a reusable lesson.
+  & Feedback identifies a root cause amid plausible competing trajectory explanations; learning requires selecting the causal evidence. \\
+\addlinespace
+\textbf{U}
+  & Earlier variants offer little or no reusable information for later variants.
+  & At least one earlier lesson should transfer to a later variant.
+  & Both transferable and variant-specific non-transferable information exist, testing useful updates and negative transfer. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+A family is a pressure-test candidate only when all five scores are at least
+one. Do not award a positive score from task difficulty alone or use baseline
+success and failure. For P, use feedback available to the intended learner;
+score 2 requires an actual trajectory with plausible competing explanations.
+
+\clearpage
+\section{Summary}
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\caption{Full splits, quick2h and conditioned five-scenario-per-split samples,
+and the one-third intermediate sample. Topic TV compares each row to its own
+full source split; it is zero for the full splits by definition. The two
+rightmost columns compare train and test topic distributions \emph{within the
+same set}; each value is shown once per three-row set.}
+\label{tab:summary}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llrrrrr}
+\toprule
+Sets & Splits &
+\shortstack{Number of\\Scenario} &
+\shortstack{Number of\\Tasks} &
+Topic TV &
+\shortstack{Train $\rightarrow$\\Normal TV} &
+\shortstack{Train $\rightarrow$\\Challenge TV} \\
+\midrule
+\multirow{3}{*}{Full}
+  & Train     & 30  & 90  & 0.0000 & \multirow{3}{*}{0.3476} & \multirow{3}{*}{0.6595} \\
+  & Normal    & 56  & 168 & 0.0000 & & \\
+  & Challenge & 139 & 417 & 0.0000 & & \\
+\midrule
+\multirow{3}{*}{Quick2h Sample}
+  & Train     & 5 & 15 & 0.0833 & \multirow{3}{*}{0.4000} & \multirow{3}{*}{0.7333} \\
+  & Normal    & 5 & 15 & 0.1131 & & \\
+  & Challenge & 5 & 15 & 0.1448 & & \\
+\midrule
+\multirow{3}{*}{Intermediate}
+  & Train     & 10 & 30  & 0.0333 & \multirow{3}{*}{0.3605} & \multirow{3}{*}{0.6594} \\
+  & Normal    & 19 & 57  & 0.0374 & & \\
+  & Challenge & 46 & 138 & 0.0159 & & \\
+\midrule
+\multirow{3}{*}{Conditioned Sample}
+  & Train     & 5 & 15 & 0.1000 & \multirow{3}{*}{0.3000} & \multirow{3}{*}{0.7000} \\
+  & Normal    & 5 & 15 & 0.1131 & & \\
+  & Challenge & 5 & 15 & 0.2233 & & \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+All three sampled sets preserve the ordering of the full data: challenge is farther
+from train than normal test. These distances concern the ten-topic
+representation, not the complete distribution of scenario semantics.
+
+\end{document}

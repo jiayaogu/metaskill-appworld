@@ -1,0 +1,201 @@
+{
+  "design": "outcome-blind quick2h train v2; normal v2 and challenge v2 fixed",
+  "source_split": "train",
+  "full_train_families": 30,
+  "old_families": [
+    "ce359b5",
+    "b0a8eae",
+    "7d7fbf6",
+    "07b42fd",
+    "6ea6792"
+  ],
+  "selected_families_in_full_split_order": [
+    "ce359b5",
+    "b0a8eae",
+    "7d7fbf6",
+    "e3d6c94",
+    "6ea6792"
+  ],
+  "retained": [
+    "ce359b5",
+    "b0a8eae",
+    "7d7fbf6",
+    "6ea6792"
+  ],
+  "removed": [
+    "07b42fd"
+  ],
+  "added": [
+    "e3d6c94"
+  ],
+  "family_difficulty": {
+    "ce359b5": 2,
+    "b0a8eae": 3,
+    "7d7fbf6": 2,
+    "e3d6c94": 1,
+    "6ea6792": 1
+  },
+  "counts": {
+    "train_v2": 15,
+    "test_normal_v2": 21,
+    "test_challenge_v2": 18,
+    "total": 54
+  },
+  "estimated_minutes_at_2_2_per_task": 118.80000000000001,
+  "selection": {
+    "candidate_rule": "retain >=4/5 old families; 5 total; D1/D2/D3=2/2/1; normal v2 and challenge v2 fixed",
+    "feasible_candidates": 46,
+    "rank": [
+      "max primary TV",
+      "sum primary TV",
+      "max secondary TV",
+      "sum secondary TV",
+      "source-order family IDs"
+    ],
+    "primary": [
+      "topic",
+      "difficulty",
+      "app_count",
+      "normal_shift_error",
+      "challenge_shift_error"
+    ],
+    "secondary": [
+      "num_apis",
+      "num_api_calls",
+      "num_solution_code_lines"
+    ],
+    "outcome_files_read": false
+  },
+  "representation": {
+    "difficulty_categories": [
+      1,
+      2,
+      3
+    ],
+    "app_count_categories": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "novelty_similarity_cutoffs": {
+      "test_normal": [
+        0.07755693197261752,
+        0.20493827954234947
+      ],
+      "test_challenge": [
+        0.025227600832362227,
+        0.07944514395534269
+      ]
+    },
+    "tfidf": {
+      "stop_words": "english",
+      "ngram_range": [
+        1,
+        2
+      ],
+      "sublinear_tf": true
+    },
+    "complexity_quartile_cutoffs": {
+      "num_apis": [
+        7.0,
+        9.0
+      ],
+      "num_api_calls": [
+        18.5,
+        69.25
+      ],
+      "num_solution_code_lines": [
+        29.0,
+        46.0
+      ]
+    }
+  },
+  "topics": [
+    "Amazon",
+    "Gmail",
+    "Todoist",
+    "Splitwise",
+    "Spotify",
+    "Venmo",
+    "Simple Note",
+    "Phone",
+    "File system",
+    "Other"
+  ],
+  "full_train_topic_probability": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.5,
+    0.2,
+    0.08333333333333333,
+    0.08333333333333333,
+    0.13333333333333333,
+    0.0
+  ],
+  "sample_train_topic_probability": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.5,
+    0.2,
+    0.1,
+    0.0,
+    0.2,
+    0.0
+  ],
+  "full_train_difficulty_probability": [
+    0.4,
+    0.4,
+    0.2
+  ],
+  "sample_train_difficulty_probability": [
+    0.4,
+    0.4,
+    0.2
+  ],
+  "full_train_app_count_probability": [
+    0.6666666666666666,
+    0.26666666666666666,
+    0.06666666666666667,
+    0.0,
+    0.0
+  ],
+  "sample_train_app_count_probability": [
+    0.6,
+    0.4,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "old_within_train_tv": {
+    "topic": 0.08333333333333334,
+    "difficulty": 0.0,
+    "app_count": 0.13333333333333333,
+    "num_apis": 0.30000000000000004,
+    "num_api_calls": 0.14444444444444446,
+    "num_solution_code_lines": 0.2777777777777778
+  },
+  "within_train_tv": {
+    "topic": 0.08333333333333334,
+    "difficulty": 0.0,
+    "app_count": 0.13333333333333333,
+    "num_apis": 0.1,
+    "num_api_calls": 0.1111111111111111,
+    "num_solution_code_lines": 0.12222222222222219
+  },
+  "full_train_to_normal_topic_tv": 0.3476190476190476,
+  "old_train_to_normal_v2_topic_tv": 0.41428571428571426,
+  "old_train_to_normal_shift_error": 0.06666666666666665,
+  "train_v2_to_normal_v2_topic_tv": 0.41428571428571426,
+  "train_to_normal_shift_error": 0.06666666666666665,
+  "full_train_to_challenge_topic_tv": 0.65947242206235,
+  "old_train_to_challenge_v2_topic_tv": 0.7777777777777778,
+  "old_train_to_challenge_shift_error": 0.11830535571542777,
+  "train_v2_to_challenge_v2_topic_tv": 0.7777777777777778,
+  "train_to_challenge_shift_error": 0.11830535571542777
+}

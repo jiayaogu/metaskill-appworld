@@ -1,0 +1,1498 @@
+## STRATEGIES AND HARD RULES
+[shr-00001] Make sure to end code blocks with ``` followed by a newline(\n).
+[shr-00005] Always look at API specifications (using apis.api_docs.show_api_doc) before calling an API.
+[shr-00006] Write small chunks of code and only one chunk of code in every step. Make sure everything is working correctly before making any irreversible change.
+
+[shr-00015] API-doc inspection has no exceptions: before the first call to any API, including supervisor APIs such as show_account_passwords and complete_task, call apis.api_docs.show_api_doc(app_name='supervisor', api_name=...). Do not assume simple-looking account or completion APIs are self-explanatory.
+[shr-00030] Do not infer current date from access-token/JWT exp claims or decode tokens; if no authoritative current-date API is available, use the latest-expiring payment-card heuristic. Do not use disallowed modules such as base64 to attempt token decoding.
+[shr-00038] Before applying the latest-expiry payment-card heuristic, explicitly search relevant app/API descriptions for an authoritative current-date/time API; if none exists, record that no current-date API is available and then choose max((expiry_year, expiry_month)). Do not infer current date from JWT/access-token exp.
+[shr-00039] Maintain an inspected_apis set for API-doc compliance: before the first call to any API, call apis.api_docs.show_api_doc(app_name=..., api_name=...) and add the tuple to inspected_apis; assert ('supervisor', 'complete_task') in inspected_apis before calling apis.supervisor.complete_task(). This prevents skipping documentation for final/simple APIs.
+[shr-00043] When applying the latest-expiry payment-card heuristic, search API descriptions for an authoritative current-date/time API across all relevant apps (amazon, supervisor, phone), not just the purchasing app; record the apps searched and that no date API was found before selecting max((expiry_year, expiry_month)).
+[shr-00051] Before executing any code block, verify it is syntactically complete: no dangling for/if/while/def, balanced parentheses/brackets, and no truncated statements. If the block is long, split it into smaller chunks (login, product selection, evidence collection, parsing, completion) instead of emitting one fragile monolith.
+[shr-00070] Inspect API docs for every API referenced in any conditional branch before executing the code block, even if current data makes the branch false; e.g., add_gift_wrapping_to_product and apply_promo_code_to_cart must be inspected before cart-restoration code that conditionally calls them.
+[shr-00076] Never convert printed Amazon search matches into literal product_ids in later code. In the same block that filters exact normalized matches, assert len(matches) == 1 and assign pid = matches[0]['product_id']; build requested_items from those pid variables. If a subsequent block does not have the variable, re-derive it programmatically from search/show_product rather than copying an ID from output.
+[shr-00080] For 'do whatever is cheaper' purchase tasks, compare complete cart totals, not isolated fees: build each candidate option in the cart, store option_a_total = show_cart(...).get('total_cost') and option_b_total = show_cart(...).get('total_cost') in variables, assert the selected option is cheaper (or use a deterministic tie-breaker if equal), then order only the selected option. Every product_id used in an option, including auxiliary items such as wrapping paper, must come from a programmatic candidate-selection variable, not printed output.
+[shr-00085] When a task requires comparing multiple cart configurations (e.g., Amazon gift wrap vs. separate wrapping paper), save each option's total and cart state, then clear the cart and rebuild only the chosen option before place_order. Assert the current cart's total_cost equals chosen_total and its product/gift-wrap state matches the chosen option; never order the last-built option by accident.
+[shr-00088] Enforce inspected_apis universally: initialize inspected_apis = set(); after each apis.api_docs.show_api_doc call add (app_name, api_name); immediately before every first API call assert (app_name, api_name) in inspected_apis, including APIs referenced only in conditional branches.
+[shr-00089] For cart-based cost comparisons, treat the live cart as user state, not a disposable scratchpad. Before building any option, snapshot the original cart_items with product_id, quantity, and gift_wrap_quantity plus promo_code/promo_valid. After ordering the chosen option, restore that original state exactly; if the original cart was empty, clear the cart and verify cart_items is empty.
+[shr-00094] For Amazon return tasks, build return_items = [(order_id, product_id, quantity_to_return, returned_quantity_before)] and keep_items = [(order_id, product_id, returned_quantity_before)] programmatically from filtered orders; loop over return_items for initiate_return and never pass literal order_id/product_id/deliverer_id/quantity copied from printed output. Derive quantity_to_return = ordered_quantity - returned_quantity, assert it is > 0, exclude the requested keep size, and select deliverer_id from show_return_deliverers by exact normalized name (e.g., UPS) with a deterministic fallback if absent.
+[shr-00098] API-doc inspection is task-local and must be mechanically enforced: at the start of every task initialize inspected_apis = set(); do not assume APIs inspected in a previous task remain inspected. Use a helper inspect_api(app, api) that calls apis.api_docs.show_api_doc and adds (app, api), and ensure_inspected(app, api) that asserts membership immediately before every first API call, including supervisor.show_account_passwords, app login APIs, search/mutation APIs, and supervisor.complete_task.
+[shr-00106] For any time-window instruction such as 'this week', 'this month', or 'today', derive the current date and all window boundaries programmatically from the authoritative date API. Parse apis.phone.get_current_date_and_time()['date'] into a datetime.date using a month map, compute the window start from that parsed date using the recorded convention, and filter orders by created_at. Never hardcode datetime.date(...) or year/month/day literals copied from printed API output; this applies to Amazon return/order filtering, not only payment-card expiry validation.
+[shr-00108] For universal-negative evidence constraints such as 'no one has reported', collect all reviews, questions, and answers without is_verified filters unless the task explicitly says verified. Encode a genuine_reports_by_pid map: a review/answer sentence counts only if it has fade/color-loss context and is not negated; a question alone does not count, but an affirmative answer to a fade-related question counts. Compute clean_candidates = [p for p in verified_candidates if not genuine_reports_by_pid[p['product_id']]], assert clean_candidates, and assign selected_product_id = selected['product_id'] from a deterministic selection over clean_candidates. Never manually choose a product_id after reading evidence output.
+[shr-00109] Derive requested size from past orders programmatically: filter past order products to the requested category, collect relative_size values, assert one size or apply a recorded deterministic rule (e.g., most recent order, then most frequent, then normalized alphabetical), and use my_size variable in search_products(relative_size=my_size) and show_product assertions. Do not hardcode size after reading printed order output.
+[shr-00117] For 'color fading after washing' universal-negative evidence, require both color-loss context and wash context: count a review/answer as a report only if normalized text contains fade/faded/fading/color loss/colour loss/bleed/run AND wash/laundry/first wash/after washing, or if it is an affirmative answer to an explicit fade-after-wash question. Do not count dye alone, generic quality complaints, or negated statements. This tightens shr-00108 for washing-specific constraints.
+[shr-00129] For 'last calendar month' spend/order aggregation, define the window as [first day of previous month, first day of current month) using apis.phone.get_current_date_and_time()['date']; if current month is January, previous month is December of prior year. Filter orders by created_at date in this half-open interval, not by rolling 30 days or by calendar-year logic.
+[shr-00132] For 'this or the last calendar month' spend/order aggregation, interpret the phrase as the union of the current and previous calendar months, not rolling 60 days and not only the previous month. Define a half-open window [first day of previous month, first day of next month) from apis.phone.get_current_date_and_time()['date']; handle January and December rollovers; assert window_start <= current_date < window_end; filter orders by created_at date in this interval. Record the convention explicitly in a comment or assertion.
+[shr-00140] No-answer action tasks are not exempt from API-doc enforcement: in the final block, call guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task) or inspect_api/ensure_inspected immediately before apis.supervisor.complete_task(); do not call complete_task bare merely because no answer is required.
+[shr-00141] For email RSVP/attendance tasks, select the event thread programmatically from normalized subject/body/event date/participants and never hardcode email_thread_id after printing candidates. If multiple candidate threads exist, read their emails and keep the one matching the requested event/audience before parsing replies. Parse RSVPs by sender email, not display name: exclude the organizer, deduplicate replies by normalized sender email, classify yes/no with explicit affirmative/negative term lists, assert yes_senders is non-empty, and set purchase quantity = len(yes_senders).
+[shr-00145] Do not treat emitted code as executed. A task is complete only after the environment returns an observed success response from supervisor.complete_task. If the final block is missing output, is unterminated, or only inspects the API, reissue a properly closed guarded_call('supervisor','complete_task', apis.supervisor.complete_task) block (with answer only if required), assert the returned dict contains 'message', print it, and only then stop.
+[shr-00148] For email RSVP purchase tasks, mechanically lock the event thread before counting replies: assert len(event_matches) == 1; if multiple candidates exist, read all candidate emails and retain only threads whose normalized body contains the requested event terms (e.g., get-together/Saturday/night) and whose organizer/sender email equals the supervisor email, then assert exactly one surviving thread. Do not proceed with subject-only matches or the first candidate.
+[shr-00151] Resolve email pronouns and delivery locations from the sender's authoritative contact record. If an email from another person says 'my work place', 'my home', or similar, identify that sender in phone.search_contacts (paginate and match normalized email/relationship) and use the sender's work_address/home_address, not the account owner's saved Amazon address named Work/Home. If Amazon lacks that address, inspect amazon.add_address, add it, re-fetch amazon.show_addresses, and derive selected_address_id by matching normalized street/city/state/country/zip fields.
+[shr-00157] For tasks that reference a person by relationship (e.g., my wife's email), resolve that person from phone.search_contacts by relationship, derive their email into a variable, and use that variable in gmail.show_inbox_threads(from_email=...). For today email filtering, parse apis.phone.get_current_date_and_time()[date] into datetime.date and use current_date.isoformat() for min_created_at/max_created_at; never hardcode the email address or date string after printing contacts/date output.
+[shr-00158] For emailed purchase instructions without attachments, select the relevant thread programmatically from the filtered inbox by normalized subject/body terms (e.g., amazon/order/buy/category), assert exactly one thread, and derive email_id from thread[email_ids][0] or by looping over email_ids. Parse the email body into requested_category, max_price, rating criterion, and delivery-location variables; use those variables for Amazon search/address selection instead of manually inferring constraints.
+[shr-00162] For emailed purchase instructions, parse every numeric constraint from the email body into variables, including requested_quantity: normalize spelled-out numbers ('one', 'two', ...) and digits, assert requested_quantity >= 1, and use that variable in inventory checks, add_product_to_cart quantity, cart/order assertions. Do not hardcode quantity after reading the email.
+[shr-00166] For emailed checklist/commitment tasks, resolve the requested audience (e.g., siblings) from phone.search_contacts by relationship, derive normalized emails into a set, and use that set to filter Gmail threads/participants/replies. Do not infer relationships from email participants, display names, or domains.
+[shr-00167] Derive checklist thread IDs and checklist email IDs programmatically from normalized subject/body terms, supervisor sender email, and participant emails; assert exactly one checklist email. Use response_to_email_id to identify commitment replies; never hardcode email_thread_id/email_id after printing candidates.
+[shr-00173] Interpret 'pick the highest rated ones' in checklist purchase tasks as highest product rating from show_product/search_products, not seller rating, unless the task explicitly says seller. After semantic and inventory filtering, select max by (product rating, lower price, lower product_id) and use selected['product_id'] programmatically.
+[shr-00174] For emailed checklist commitments, parse checklist lines into normalized item names and quantities. Treat a reply that names an item as covering the entire checklist line for that item unless the reply explicitly states a partial quantity; if an explicit partial quantity is present, subtract it from the checklist quantity and keep the remainder. Compute remaining items by item-name membership or positive residual quantity, not by requiring the reply quantity to equal the checklist quantity.
+[shr-00178] For multi-candidate Amazon checklist purchases, use metadata-first selection: filter/rank candidates from search_products fields (product_type, name, description, rating, price, inventory_quantity), then call show_product only for the selected product or a small top-K set to verify authoritative fields before cart. Do not call show_product for every broad-search candidate because this can exceed request limits; if a request-limit error occurs, reduce verification to top-K/selected only while still deriving product_id programmatically.
+[shr-00183] For named-weekday event purchases with a 'by end of day before' deadline, parse apis.phone.get_current_date_and_time()['date'] into datetime.date, compute event_date as the next occurrence of the requested weekday (Saturday=5, Sunday=6, etc.; treat today as the event only when the event is later today), then set delivery_deadline = event_date if event_date == current_date else event_date - datetime.timedelta(days=1). Assert current_date <= delivery_deadline. Use delivery_deadline for both pre-order delivery_days filtering and post-order expected_delivery_at verification; never infer the deadline from printed date strings or hardcode delivery_days <= 1.
+[shr-00184] When a purchase quantity is defined by relationship audience (e.g., 'all of my friends and roommates'), derive it from phone.search_contacts: paginate all contacts, filter normalized relationships containing any requested audience term, deduplicate by contact_id, assert num_invitees > 0, and use that variable as cart/order quantity. Do not assume a fixed count or infer audience from email participants/display names.
+[shr-00188] If an irreversible purchase or cart restoration has already succeeded but the final supervisor.complete_task call produces no observed USER output, do not repeat place_order, add_product_to_cart, clear_cart, or cart restoration. Reissue only a minimal final block that calls guarded_call('supervisor','complete_task', apis.supervisor.complete_task) (with answer=variable only if required), asserts isinstance(result, dict) and 'message' in result, prints result, ends with triple backticks followed by a newline, and waits for the environment's success output before stopping. If required variables are missing, re-derive only read-only state such as show_order or show_cart; never reorder.
+[shr-00189] When a task requires a monetary total rounded to the nearest whole number (e.g., Amazon wishlist price * quantity), do not use Python round(...) because it uses banker's rounding on exact .5 values. Use Decimal(str(price)) * Decimal(str(quantity)) and quantize(Decimal('1'), rounding=ROUND_HALF_UP), then format the integer. For wishlist-to-text tasks, build each line directly from show_wish_list product_name, price, and quantity; ignore tax/delivery unless explicitly requested.
+[shr-00193] When a task requires half-up monetary rounding, do not assume the `decimal` module is available; some environments disallow `decimal`. If module availability is uncertain, prefer a no-Decimal integer/string-scaled helper instead of templates that import Decimal. If an existing template imports `decimal` and the import fails, rebuild only the formatting block with the no-Decimal helper; never fall back to Python `round(...)` for final integers because of banker's rounding, and never hardcode printed totals. For Amazon wishlist-to-text tasks, preserve exact `product_name` from `show_wish_list`, ignore tax/delivery unless requested, and only send after the message variable is constructed programmatically.
+[shr-00200] For relationship-specified delivery addresses such as 'parents' home address', resolve all matching contacts from phone.search_contacts using exact normalized relationship labels (e.g., 'parent', 'mother', 'father'), deduplicate by contact_id, assert the set is non-empty, and assert all normalized home_address values are identical or apply a recorded deterministic rule if they differ. Derive target_addr from that common address; never use contacts[0] without this consistency check. Then programmatically check amazon.show_addresses for normalized street/city/state/country/zip equality and call amazon.add_address only if the match list is empty; after adding, re-fetch amazon.show_addresses and derive selected_address_id from exactly one normalized match.
+[shr-00205] Block-local API-doc preflight must be derived from the code block source, not from runtime execution. Before executing any block, enumerate every (app, api) referenced in that block, including APIs passed to guarded_call inside if/else branches and cart-restoration APIs such as add_gift_wrapping_to_product, apply_promo_code_to_cart, and clear_cart; inspect them all and assert membership before running. Do not rely on guarded_call's lazy inspection because false branches never call it.
+[shr-00206] For any Amazon purchase that mutates the live cart, snapshot original cart_items with product_id, quantity, gift_wrap_quantity plus promo_code/promo_valid before adding requested items. After place_order, restore exactly: if original cart was empty, call clear_cart and assert show_cart cart_items == []; if non-empty, re-add items and conditionally reapply gift wrap/promo. This applies to ordinary named-product orders, not only cost comparisons.
+[shr-00213] For tasks that deliver the same product to multiple locations or with different gift-wrap states, place separate orders because amazon.place_order applies one address_id and payment_card_id to the entire cart. Snapshot the original cart once before the first order; for each required delivery, rebuild a fresh cart with clear_cart_first=True, set the exact gift_wrap_quantity, verify cart and inventory, place order, and verify order. Restore the original cart only after all orders are complete.
+[shr-00218] Mechanical block-source preflight: before executing any code block, scan the block source and build a literal preflight list of every (app, api) appearing in guarded_call('app','api',...) or apis.app.api(...). Call preflight_apis on that list before execution. Do not decide the list from runtime values; conditional APIs such as apply_promo_code_to_cart must be inspected even when orig_promo is None.
+[shr-00221] For 'N identical items' split across different addresses or gift-wrap states, lock one selected_product_id and use that exact product_id for every order. Before selection require inventory_quantity >= N; before each order re-fetch show_product and require inventory_quantity >= remaining_units. Do not satisfy 'identical' by choosing different variations, similarly named products, or separate product_ids.
+[shr-00224] For plural relationship audiences with distinct delivery addresses (e.g., 'each of my siblings' delivered to their homes), do not collapse addresses into one common address. Paginate phone.search_contacts, filter normalized relationships containing audience terms, deduplicate by contact_id, assert the audience list is non-empty and every contact has a non-empty home_address; parse each home_address, add missing Amazon addresses with unique names, re-fetch show_addresses, derive one address_id per contact by normalized street/city/state/country/zip, assert the address_id count equals audience size and IDs are distinct, then place one identical gift order per address.
+[shr-00225] For 'top-rated <category>' product purchases, interpret top-rated as highest product rating unless the task explicitly says seller. Build candidates with exact product_type and inventory_quantity >= audience size, verify candidates with show_product, then select max by (rating, lower price, lower product_id) and lock that one product_id for all split orders.
+[shr-00229] For 'top-rated <category>' purchases, do not build the candidate universe from search_products(product_type=category) alone because listings may be mislabeled or use a generic product_type. Union paginated search_products(product_type=category) and search_products(query=category), deduplicate by product_id, verify candidates with show_product, and accept candidates whose product_type matches or whose normalized name/description semantically contains the requested category while excluding accessories/adjacent items. Then filter inventory_quantity >= audience size and select max by (rating, lower price, lower product_id).
+[shr-00233] For plural relationship audiences requiring separate home deliveries, implement address resolution as a per-contact existence-gated loop: after parsing each contact home_address, compute matches = [a for a in amazon.show_addresses(...) if addr_match(a, target_addr)]; call amazon.add_address only when matches is empty for that contact, re-fetch show_addresses, and assert exactly one match. Never print show_addresses and then batch-add all audience addresses. Use unique address names and assert the final address_id set size equals audience size.
+[shr-00235] Bootstrap API-doc enforcement must precede the first app call: initialize inspected_apis, inspect_api, ensure_inspected, and guarded_call before calling any app API. The first call should be guarded_call('supervisor', 'show_account_passwords', apis.supervisor.show_account_passwords) after inspect_api('supervisor', 'show_account_passwords'). If you call apis.api_docs.show_api_doc directly, immediately add (app, api) to inspected_apis; direct doc printing alone does not satisfy ensure_inspected.
+[shr-00236] For personal preference constraints from text messages (e.g., favorite color), parse the question-answer pair rather than scanning all messages for any matching keyword. Locate the supervisor's message containing the preference question, then parse the recipient's reply with a context regex such as 'it is ([a-z]+)' or 'my favorite color is ([a-z]+)' after normalizing punctuation; assert the extracted value is non-empty and use it as a variable. Do not accept a color word from unrelated messages.
+[shr-00240] For personal preference constraints from phone voice messages (e.g., favorite color), parse the question-answer pair from voice messages, not text messages or keyword scans. Paginate phone.search_voice_messages for the recipient, locate the supervisor's message containing the preference question, then parse the recipient's reply with sent_at > question.sent_at using a context regex such as 'it is ([a-z]+)' or 'my favorite color is ([a-z]+)'; assert the extracted value is non-empty and use it as a variable. Do not accept a color word from unrelated voice messages.
+[shr-00247] For color-specific category purchases (e.g., favorite-color sweater), build the candidate universe from category searches (product_type and query), not from color-filtered searches. Filter candidates by product_type/name/description and inventory_quantity >= 1 from search metadata, then verify all remaining in-stock candidates with show_product, or if too many use a documented top-K rule. Derive color candidates from both authoritative main color and authoritative variation color, verify each color product_id with show_product, then select max by (rating, lower price, lower product_id) and lock that product_id.
+[shr-00249] For purchase instructions from phone text messages, resolve the named sender from paginated phone.search_contacts by exact normalized first_name (and last_name when available), assert exactly one contact, then paginate all phone.search_text_messages with that contact's phone_number. Locate the recommendation message programmatically by normalized keywords such as buy/recommend/cheaper/quoted product names, extract quoted product names with a parser, assert exactly one recommendation message and the expected number of candidates, and parse the selection rule (e.g., 'pick the cheaper one') into a variable. If the user task also names a product category (e.g., 'food scale'), enforce that category as a hard constraint on the final selected product unless the message explicitly overrides it: filter candidates by authoritative show_product name/description/category, select the unique category-valid candidate if only one exists, otherwise apply the parsed selection rule among category-valid candidates; never order a non-category item merely because it is cheaper.
+[shr-00254] For unspecified Amazon address, exhaust default discovery before any fallback: inspect and call supervisor.show_addresses and amazon.show_account, assert/record that neither exposes default_address_id or an equivalent default address field, then derive selected_address_id from amazon.show_addresses using exact normalized name 'Home' if present (assert exactly one match), otherwise lowest address_id; assert selected_address_id is in amazon.show_addresses before place_order. Do not choose lowest address_id after checking only amazon.show_account or supervisor.show_payment_cards.
+## APIs TO USE FOR SPECIFIC INFORMATION
+[api-00004] You can use the "supervisor" app to get information about my accounts and use the "phone" app to get information about friends and family.
+
+[api-00013] Amazon purchase API schemas: search_products returns a list of product dicts with product_id, seller_id, product_type, name, price, inventory_quantity, rating, variations; show_seller returns a dict with seller_id, name, rating; show_payment_cards returns a list of dicts with payment_card_id, card_name; show_addresses returns a list of dicts with address_id, name; add_product_to_cart returns a message dict; show_cart returns a cart dict with cart_items; place_order returns a dict with order_id and message; show_order returns an order dict with address_id, payment_card_id, and order_items.
+[api-00017] For highest-rated seller tasks, do not treat seller_ids seen in search_products as the complete seller universe. Also enumerate candidate sellers for the category using search_sellers and/or show_product_feature_choices(product_type=...), cross-check with product seller_ids, fetch authoritative ratings with show_seller, and break seller-rating ties deterministically (e.g., lowest seller_id).
+[api-00020] Amazon category-purchase schema clarifications: supervisor.show_account_passwords returns a list of {'account_name', 'password'}; amazon.login returns {'access_token', 'token_type'}; search_products and show_product include name and description, which should be used for semantic validation; show_product_feature_choices(product_type=...) returns {'colors': [...], 'relative_sizes': [...], 'sellers': [{'seller_id': int, 'name': str}]} and does NOT include seller rating, so call show_seller for each candidate seller_id to get authoritative rating; show_cart returns cart_items with quantity; show_order returns order_items with ordered_quantity.
+[api-00024] Amazon payment-card schema clarification: show_payment_cards returns payment_card_id, card_name, owner_name, card_number, expiry_year, expiry_month, and cvv_number. When no payment card is specified, do not select by arbitrary ID; validate expiry_year/expiry_month before place_order.
+[api-00031] Amazon search_products rating filters: for minimum product/seller rating tasks, pass min_product_rating and min_seller_rating (with product_type/query) to reduce noise, but treat these filters as prefilter only; still verify seller ratings with show_seller and product details with show_product.
+[api-00034] Amazon wishlist schema: show_wish_list returns a list of dicts with product_id, product_name, quantity, price; it does NOT include product_type, inventory_quantity, length/width/height, or variations. For wishlist items with physical constraints, derive candidate product_ids from product_name, then call show_product(product_id=...) for each candidate to get authoritative dimensions, inventory, product_type, name/description, and variations.
+[api-00044] Amazon show_product full schema: returns product_id, seller_id, product_type, name, description, price, delivery_days, inventory_quantity, weight, length, width, height, color, relative_size, rating, num_product_reviews, num_product_questions, and variations (list of dicts with product_id, relative_size, color). For physical-fit wishlist purchases, use length/width for fit (allow swapped orientation only if task does not fix orientation), product_type/name/description for semantic validation, and inventory_quantity for stock.
+[api-00047] Amazon product evidence API schemas: show_product_reviews(product_id=..., is_verified=True, page_index=..., page_limit=...) returns a list of review dicts with review_id, product_id, is_verified, rating, title, text, created_at, and user{name,email}. show_product_questions(product_id=..., page_index=..., page_limit=...) returns a list of question dicts with question_id, question, created_at, and user{name,email}; it does NOT include an is_verified flag. show_product_question_answers(question_id=..., is_verified=True, page_index=..., page_limit=...) returns a list of answer dicts with question_answer_id, question_id, is_verified, answer, created_at, and user{name,email}. Verified-purchaser status must be checked on reviews and answers, not on questions.
+[api-00056] Amazon evidence product/API schema clarification: search_products may return accessories or variant listings; show_product.variations should not be used for evidence unless requested. Normalize product names (lowercase, hyphens to spaces) to match variants such as 'e-reader', 'eReader', and 'e reader'. Evidence endpoints return lists directly; inspect docs for access_token requirements and check for error dicts.
+[api-00058] Amazon search_products evidence schema: the documented parameters include query, product_type, color, relative_size, price/rating filters, seller_id, page_index, page_limit, and sort_by, but NOT access_token. For product evidence tasks, call search_products without access_token unless the current API doc explicitly lists it; narrow device/laptop searches by adding product_type (e.g., 'laptop') along with the exact query to reduce irrelevant accessories and unrelated categories, then still derive the product_id programmatically from exact normalized name matches.
+[api-00062] Amazon cart-state schema and restoration APIs: show_cart returns a dict with promo_code, promo_valid, and cart_items; each cart_item includes product_id, product_name, delivery_days, quantity, price, gift_wrap_quantity. show_order order_items include ordered_quantity and gift_wrap_quantity. Relevant mutation APIs include clear_cart, add_product_to_cart, add_gift_wrapping_to_product, remove_gift_wrapping_from_product, apply_promo_code_to_cart, and remove_promo_code_from_cart. To revert a cart exactly, snapshot per-item gift_wrap_quantity and cart-level promo_code/promo_valid, inspect the mutation API docs, re-add items, reapply gift wrapping/promo code when present, and verify full cart equality rather than only product_id->quantity.
+[api-00067] Phone current-date schema: apis.phone.get_current_date_and_time() returns {'date': 'Weekday, Month Day, Year', 'time': 'HH:MM AM/PM'} and requires no access_token. Use it as the authoritative current date for payment-card expiry validation before falling back to latest-expiry heuristics.
+[api-00068] Amazon financial cart/order schema: show_cart returns delivery_fee, base_cost, tax, gift_wrap_fee, discount, total_cost, promo_code, promo_valid, and cart_items; show_order returns tax, delivery_fee, gift_wrap_fee, discount, paid_amount, and order_items with price, ordered_quantity, and gift_wrap_quantity.
+[api-00077] Amazon named-product schema: search_products/show_product can return a product_type that is a generic category different from the requested title, e.g. 'Athleta Studio Wrap' may have product_type 'yoga pants'. For explicitly named products, exact normalized name match plus show_product name assertion is authoritative; do not reject solely because product_type is not the guessed category, but still verify inventory and derive product_id programmatically.
+[api-00081] Amazon gift-wrap mutation schema: add_gift_wrapping_to_product(product_id=..., access_token=..., quantity=...) and remove_gift_wrapping_from_product(...) return a message dict; assert the success message, then verify show_cart cart_items gift_wrap_quantity reflects the intended wrapping state.
+[api-00086] Amazon gift-wrap auxiliary search schema: search_products(query='gift wrap') can return unrelated items whose names contain 'wrap' (e.g., socks, yoga pants). For separate wrapping paper, use product_type='gift wrap' and/or require normalized name/description to contain 'gift wrap' or 'wrapping paper'; then filter inventory_quantity >= needed quantity and choose cheapest programmatically.
+[api-00090] Amazon/supervisor payment-card and address schemas: supervisor.show_payment_cards returns a list of dicts with owner_name, card_name, card_number, expiry_year, expiry_month, and cvv_number but no payment_card_id; supervisor.show_addresses returns a list of dicts with name, street_address, city, state, country, and zip_code but no address_id. Amazon.show_payment_cards and Amazon.show_addresses provide the IDs required by place_order. Query supervisor APIs for default/profile fields when checking unspecified card/address, but derive selected_payment_card_id and selected_address_id from Amazon lists.
+[api-00093] Amazon return/order schema: show_orders returns a list of order dicts with order_id, created_at, and order_items; each order_item includes product_id, ordered_quantity, returned_quantity, gift_wrap_quantity, price, expected_delivery_at, and delivered_at. show_return_deliverers returns a list of {'deliverer_id', 'name'} and takes no parameters. initiate_return(order_id=..., product_id=..., deliverer_id=..., quantity=..., access_token=...) returns {'message', 'return_id'}; quantity should be the remaining returnable quantity (ordered_quantity - returned_quantity). show_order returns order_items with returned_quantity for post-return verification. If query and sort_by are both provided, show_orders is relevance-ranked first, so for time-window tasks paginate with sort_by='-created_at' and filter created_at explicitly.
+[api-00102] Phone/Simple Note messaging schema: phone.search_contacts returns a list of contact dicts with contact_id, first_name, last_name, email, phone_number, relationships; phone.search_text_messages returns a list of message dicts with text_message_id, sender{name, phone_number}, message, sent_at; phone.send_text_message(access_token=..., phone_number=..., message=...) returns a message dict; simple_note.search_notes returns note metadata (note_id, title, tags, created_at) without content, while simple_note.show_note(note_id=..., access_token=...) returns the note dict including content.
+[api-00103] Spotify playlist/song schema: show_playlist_library returns a list of playlist dicts including playlist_id; show_playlist(playlist_id=..., access_token=...) returns a dict with songs list containing song id; show_song(song_id=...) returns a dict with song_id, title, like_count. For most-liked tasks, collect unique song ids, fetch show_song for each, select max by like_count with deterministic tie-breaker, and pass the selected song's title variable to complete_task.
+[api-00110] Amazon search_products relative_size schema: relative_size accepts one of ['extra-small', 'small', 'medium', 'large', 'extra-large']; derive my_size from past order show_product['relative_size'] and pass it directly after normalization.
+[api-00121] Amazon show_account schema: returns first_name, last_name, email, registered_at, last_logged_in, verified, is_prime; it may not include default_payment_card_id or default_address_id. Call it before unspecified-card/address fallback and assert absence of default fields, then derive IDs from amazon.show_payment_cards/show_addresses.
+[api-00126] Amazon show_orders financial aggregation schema: show_orders returns a list of order dicts that include order_id, created_at, paid_amount, tax, delivery_fee, gift_wrap_fee, discount, address_id, payment_card_id, and order_items. For 'how much did I spend' tasks, sum order-level paid_amount after deduplicating by order_id; do not assume only show_order exposes paid_amount.
+[api-00130] Amazon show_orders spend aggregation: the documented response is a list of order dicts containing order_id, created_at, and paid_amount. Paginate with page_index/page_limit and sort_by='-created_at' when documented. If the live response is a dict, accept it only when the success schema documents a list-valued key; extract that key and assert it is a list. Parse created_at by taking the date portion before 'T' or whitespace; do not assume ISO 'T'.
+[api-00135] Gmail/file_system email-attachment schema: gmail.show_inbox_threads returns a list of thread dicts with email_thread_id, email_ids, subject, participants (list of {'name','email'}), created_at; inspect docs for page_index/page_limit and paginate until an empty page when documented. gmail.show_email(email_id=..., access_token=...) returns a dict with subject, body, sender, recipients, and attachments list containing {'id','file_name'}. gmail.download_attachment(attachment_id=..., file_system_access_token=..., access_token=..., download_to_file_path=..., overwrite=...) returns {'message','file_path'} and requires a file_system login token. file_system.login returns {'access_token','token_type'}; file_system.show_file(file_path=..., access_token=...) returns {'file_id','path','content','created_at','updated_at'}. Use file content as the authoritative checklist source.
+[api-00146] Supervisor completion schema: apis.supervisor.complete_task() returns a dict containing 'message' for successful completion. For no-answer action tasks call it without answer; for answer tasks call complete_task(answer=<variable>). Always inspect the API doc and assert isinstance(result, dict) and 'message' in result before treating the task as done.
+[api-00152] Email-specified delivery schema: phone.search_contacts returns contact dicts including home_address and work_address (often newline-separated street/city/state/country/zip); gmail.show_inbox_threads supports from_email and min_created_at/max_created_at (YYYY-MM-DD) for sender/date filtering; amazon.show_addresses returns address_id, name, street_address, city, state, country, zip_code; amazon.add_address requires access_token plus address fields, but after adding re-fetch show_addresses and match normalized fields to obtain address_id rather than assuming the add response contains it.
+[api-00168] gmail.show_email response schema includes response_to_email_id (integer or null) identifying the email being replied to; use it to select commitment replies to a checklist email. gmail.show_inbox_threads participants are only thread metadata and are not authoritative for family relationships; resolve siblings/friends from phone.search_contacts relationships.
+[api-00177] phone.search_contacts schema: accepts access_token, query, relationship, page_index, page_limit; relationship filters by contact relationship (e.g., 'roommate'), and responses are paginated. Paginate until an empty page and use returned email/relationships to build audience email sets.
+[api-00179] Amazon search_products bulk-filter schema: each returned product dict can include product_id, seller_id, product_type, name, description, price, rating, inventory_quantity, and variations; for checklist purchases this is sufficient for deduplication, semantic/type filtering, inventory >= requested quantity, and highest-rating selection. When query and sort_by are both provided, results are relevance-ranked first and only sorted within each page, so collect all pages before applying max/ranking; do not assume the first page contains the globally highest-rated match.
+[api-00196] Amazon wishlist quantity schema: show_wish_list may document or return quantity as a float (e.g., 1.0) even when it is semantically an integer. Validate with isinstance(quantity, (int, float)) and float(quantity).is_integer(), then coerce int(quantity); do not assert isinstance(quantity, int).
+[api-00197] Phone send_text_message success schema: success returns a dict containing text_message_id and a message such as 'Text message sent.'; failure can also contain a message field. Assert 'text_message_id' in result and normalized message contains 'sent' (or no failure wording) before treating the send as successful.
+[api-00209] Amazon address schema clarification: amazon.show_addresses may return zip_code as int or float-like value; normalize to string and strip trailing .0 before comparison. amazon.add_address success may return {'message', 'address_id'}, but still re-fetch show_addresses and derive selected_address_id from exactly one normalized match; pass zip_code as int if the API doc requires it.
+[api-00214] Amazon place_order schema clarification: place_order takes one payment_card_id and one address_id for all cart items; it cannot split one cart across multiple addresses or apply different gift-wrap states per address. For 'deliver one to X and one to Y' tasks, create multiple carts/orders.
+[api-00222] Amazon numeric purchase constraints: search_products and show_product include rating and num_product_reviews. For tasks like 'at least 5 reviews and at least 4.5 rating', filter programmatically with num_product_reviews >= requested_review_count and rating >= requested_rating from authoritative show_product fields; do not paginate show_product_reviews merely to count reviews unless the task requires reading review content or evidence.
+[api-00231] Amazon add_address zip_code handling: inspect the parameter type. If zip_code is accepted as string, pass the normalized string from the contact address to preserve leading zeros. If the API requires integer, convert only after recording that leading zeros may be lost and compare re-fetched addresses using normalized string/int equality; do not assume int(zip) is safe for all addresses.
+[api-00237] Amazon color-filter schema: search_products(color=...) is not category-safe; it can return products of many product_types that merely have that color. For color-specific category purchases, build candidates from category searches (product_type and query) without relying on color filter, then verify with show_product and accept only products whose authoritative color or an available variation color matches the requested color. If the requested color exists only as a variation, select the variation product_id when the API exposes it; otherwise require main color equality.
+[api-00241] Phone voice-message schema: apis.phone.search_voice_messages(access_token=..., phone_number=..., query=..., page_index=..., page_limit=..., sort_by=...) returns a list of dicts with voice_message_id, sender{name, phone_number}, receiver{name, phone_number}, message, and sent_at. Paginate until an empty page; when extracting preferences, fetch all messages with the recipient phone_number (or paginate query results) and use sent_at ordering rather than assuming the first page contains the relevant reply.
+[api-00245] Phone contact query schema clarification: phone.search_contacts(query=...) is fuzzy and paginated; it may return unrelated contacts and may not include all matches on the first page. Paginate query results until an empty page, then filter by exact normalized first_name (and last_name when available) and assert exactly one recipient. Do not use the first returned contact or assume query='Valerie' returns only Valeries.
+[api-00246] Amazon color/variation schema clarification: search_products.variations is metadata only and may be incomplete or non-authoritative for color-specific purchases. For a requested color, call show_product(product_id=...) on category candidates to obtain authoritative color, variations, rating, price, and inventory; if the requested color appears only in a variation, call show_product on that variation product_id and assert its authoritative color before ordering.
+[api-00250] Phone text-message recommendation schema: phone.search_text_messages returns message dicts with sender{name, phone_number}, receiver{name, phone_number}, message, and sent_at; it may be paginated. When extracting a recommendation, fetch all messages with the resolved contact phone_number (paginate until an empty page) rather than relying on query or the first page. Quoted product names in the message field are the authoritative candidate list; parse them programmatically and use them for exact Amazon product resolution.
+## USEFUL CODE SNIPPETS AND TEMPLATES
+
+[code-00014] Programmatic highest-rated-seller purchase selection:
+products = []
+page_index = 0
+while True:
+    page = apis.amazon.search_products(product_type='air purifier', page_index=page_index, page_limit=20)
+    if not page:
+        break
+    products.extend(page)
+    page_index += 1
+seller_ids = sorted({p['seller_id'] for p in products})
+sellers = [apis.amazon.show_seller(seller_id=sid) for sid in seller_ids]
+best_seller = max(sellers, key=lambda s: s['rating'])
+candidates = [p for p in products if p['seller_id'] == best_seller['seller_id'] and p['inventory_quantity'] > 0]
+selected = max(candidates, key=lambda p: (p['rating'], -p['price']))
+print(best_seller, selected['product_id'])
+[code-00019] Programmatic purchase ID selection and pre-order assertions:
+selected_product_id = selected['product_id']
+assert selected['product_type'] == 'watch' and selected['inventory_quantity'] > 0
+payment_cards = apis.amazon.show_payment_cards(access_token=amazon_access_token)
+matching_cards = [c for c in payment_cards if c['card_name'].lower() == 'wells fargo']
+assert len(matching_cards) == 1
+selected_payment_card_id = matching_cards[0]['payment_card_id']
+addresses = apis.amazon.show_addresses(access_token=amazon_access_token)
+matching_addresses = [a for a in addresses if a['name'].lower() == 'work']
+assert len(matching_addresses) == 1
+selected_address_id = matching_addresses[0]['address_id']
+apis.amazon.add_product_to_cart(product_id=selected_product_id, access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+cart = apis.amazon.show_cart(access_token=amazon_access_token)
+assert all(item['product_id'] == selected_product_id for item in cart['cart_items'])
+order_result = apis.amazon.place_order(payment_card_id=selected_payment_card_id, address_id=selected_address_id, access_token=amazon_access_token)
+[code-00023] Robust highest-rated-seller category selection with semantic filtering and deterministic tie-breakers:
+category = 'portable air conditioner'
+products = []
+page_index = 0
+while True:
+    page = apis.amazon.search_products(product_type=category, page_index=page_index, page_limit=20)
+    if not page:
+        break
+    products.extend(page)
+    page_index += 1
+feature_choices = apis.amazon.show_product_feature_choices(product_type=category)
+seller_ids = sorted({p['seller_id'] for p in products} | {s['seller_id'] for s in feature_choices['sellers']})
+sellers = [apis.amazon.show_seller(seller_id=sid) for sid in seller_ids]
+best_seller = max(sellers, key=lambda s: (s['rating'], -s['seller_id']))
+# Replace keywords/bad_terms for other requested categories.
+keywords = ['air conditioner']
+bad_terms = ['tv', 'television']
+def semantic_match(p):
+    text = (p.get('name', '') + ' ' + p.get('description', '')).lower()
+    return any(k in text for k in keywords) and not any(b in text for b in bad_terms)
+candidates = [p for p in products if p['seller_id'] == best_seller['seller_id'] and p['inventory_quantity'] > 0 and semantic_match(p)]
+assert candidates
+selected = max(candidates, key=lambda p: (p['rating'], -p['price'], -p['product_id']))
+assert selected['product_type'] == category
+print(best_seller, selected['product_id'], selected['name'])
+[code-00036] Programmatic wishlist fit selection (replace category_terms and max_l/max_w):
+wishlist = apis.amazon.show_wish_list(access_token=amazon_access_token)
+category_terms = ['dish rack']
+candidate_ids = [w['product_id'] for w in wishlist if any(term in w['product_name'].lower() for term in category_terms)]
+assert candidate_ids
+max_l, max_w = 15.3, 13.3
+def fits(p):
+    return p['inventory_quantity'] > 0 and ((p['length'] <= max_l and p['width'] <= max_w) or (p['length'] <= max_w and p['width'] <= max_l))
+def semantic(p):
+    text = (p.get('name', '') + ' ' + p.get('description', '')).lower()
+    return any(term in text for term in category_terms)
+seen = set()
+fits_products = []
+for pid in candidate_ids:
+    p = apis.amazon.show_product(product_id=pid)
+    if p['product_id'] not in seen and semantic(p) and fits(p):
+        seen.add(p['product_id'])
+        fits_products.append(p)
+    # Inspect variations only when variations are allowed; if not, remove this loop or require variation_id in wishlist_ids.
+    for v in p.get('variations', []):
+        vid = v['product_id']
+        if vid in seen:
+            continue
+        vp = apis.amazon.show_product(product_id=vid)
+        if semantic(vp) and fits(vp):
+            seen.add(vid)
+            fits_products.append(vp)
+assert fits_products
+selected = min(fits_products, key=lambda x: (x['price'], -x['rating'], x['product_id']))
+selected_product_id = selected['product_id']
+print(selected_product_id, selected['name'])
+[code-00046] # Explicit assertions for wishlist fit purchase with unspecified card/address
+wishlist_ids = {w['product_id'] for w in wishlist}
+assert selected_product_id in wishlist_ids
+# Record that no current-date API was found after inspecting amazon/supervisor/phone API descriptions.
+no_current_date_api = True
+max_expiry = max((c['expiry_year'], c['expiry_month']) for c in cards)
+matching_cards = [c for c in cards if (c['expiry_year'], c['expiry_month']) == max_expiry]
+selected_payment_card_id = min(c['payment_card_id'] for c in matching_cards)
+assert selected_payment_card_id in {c['payment_card_id'] for c in cards}
+selected_address_id = min(a['address_id'] for a in addresses)
+assert selected_address_id in {a['address_id'] for a in addresses}
+add_result = apis.amazon.add_product_to_cart(product_id=selected_product_id, access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+assert 'added to the cart' in add_result.get('message', '').lower()
+cart = apis.amazon.show_cart(access_token=amazon_access_token)
+assert len(cart['cart_items']) == 1
+assert cart['cart_items'][0]['product_id'] == selected_product_id
+assert cart['cart_items'][0]['quantity'] == 1
+[code-00050] # Replace query/name and parse_hours for other evidence attributes.
+query = 'ecobee SmartCamera'
+target_name = 'ecobee smartcamera'
+products = []
+page_index = 0
+while True:
+    page = apis.amazon.search_products(query=query, page_index=page_index, page_limit=20)
+    if not page:
+        break
+    products.extend(page)
+    page_index += 1
+matches = [p for p in products if p['name'].lower() == target_name]
+assert len(matches) == 1
+product_id = matches[0]['product_id']
+
+verified_reviews = []
+page_index = 0
+while True:
+    page = apis.amazon.show_product_reviews(product_id=product_id, is_verified=True, page_index=page_index, page_limit=20)
+    if not page:
+        break
+    verified_reviews.extend(page)
+    page_index += 1
+
+questions = []
+page_index = 0
+while True:
+    page = apis.amazon.show_product_questions(product_id=product_id, page_index=page_index, page_limit=20)
+    if not page:
+        break
+    questions.extend(page)
+    page_index += 1
+
+verified_answers = []
+for q in questions:
+    page_index = 0
+    while True:
+        page = apis.amazon.show_product_question_answers(question_id=q['question_id'], is_verified=True, page_index=page_index, page_limit=20)
+        if not page:
+            break
+        verified_answers.extend(page)
+        page_index += 1
+
+def parse_hours(text):
+    text = text.lower()
+    i = 0
+    while i < len(text):
+        if text[i].isdigit():
+            j = i
+            while j < len(text) and text[j].isdigit():
+                j += 1
+            num = int(text[i:j])
+            rest = text[j:].lstrip()
+            if rest.startswith('hour'):
+                return num
+            i = j
+        else:
+            i += 1
+    return None
+
+evidence = []
+for r in verified_reviews:
+    h = parse_hours(r['title'] + ' ' + r['text'])
+    if h is not None:
+        evidence.append((r['created_at'], h, 'review', r['review_id']))
+for a in verified_answers:
+    h = parse_hours(a['answer'])
+    if h is not None:
+        evidence.append((a['created_at'], h, 'answer', a['question_answer_id']))
+assert evidence
+evidence.sort(key=lambda x: x[0], reverse=True)
+answer = evidence[0][1]
+print(product_id, answer, evidence)
+# Inspect complete_task schema before calling it; if it expects a string, format answer accordingly.
+print(apis.api_docs.show_api_doc(app_name='supervisor', api_name='complete_task'))
+apis.supervisor.complete_task(answer=answer)
+[code-00057] # Battery-hour context parser (use with verified reviews/answers only).
+import re
+def norm_name(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+def battery_hours(text):
+    t = norm_name(text)
+    if not any(k in t for k in ('battery', 'power', 'charge', 'charging')): return None
+    m = re.search(r'(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)', t)
+    return float(m.group(1)) if m else None
+# For Q&A, pass question + answer so battery-related questions count.
+[code-00066] # Cart-preserving order template (inspect docs for gift-wrap/promo API parameters before running).
+original_cart = apis.amazon.show_cart(access_token=amazon_access_token)
+original_items = [{'product_id': i['product_id'], 'quantity': i['quantity'], 'gift_wrap_quantity': i.get('gift_wrap_quantity', 0)} for i in original_cart['cart_items']]
+original_promo = original_cart.get('promo_code')
+original_promo_valid = original_cart.get('promo_valid')
+
+cards = apis.amazon.show_payment_cards(access_token=amazon_access_token)
+discover = [c for c in cards if c['card_name'].lower() == 'discover']
+if discover:
+    selected_payment_card_id = min(c['payment_card_id'] for c in discover)
+else:
+    # Fallback only after confirming no current-date API; use latest expiry then lowest id.
+    max_expiry = max((c['expiry_year'], c['expiry_month']) for c in cards)
+    selected_payment_card_id = min(c['payment_card_id'] for c in cards if (c['expiry_year'], c['expiry_month']) == max_expiry)
+assert selected_payment_card_id in {c['payment_card_id'] for c in cards}
+
+# selected_product_ids and selected_address_id must be derived from exact-match variables.
+for idx, pid in enumerate(selected_product_ids):
+    res = apis.amazon.add_product_to_cart(product_id=pid, access_token=amazon_access_token, quantity=1, clear_cart_first=(idx == 0))
+    assert 'added to the cart' in res.get('message', '').lower()
+order_result = apis.amazon.place_order(payment_card_id=selected_payment_card_id, address_id=selected_address_id, access_token=amazon_access_token)
+assert 'order_id' in order_result
+
+if not original_items:
+    apis.amazon.clear_cart(access_token=amazon_access_token)
+else:
+    for idx, item in enumerate(original_items):
+        res = apis.amazon.add_product_to_cart(product_id=item['product_id'], access_token=amazon_access_token, quantity=item['quantity'], clear_cart_first=(idx == 0))
+        assert 'added to the cart' in res.get('message', '').lower()
+        if item['gift_wrap_quantity'] > 0:
+            gift_res = apis.amazon.add_gift_wrapping_to_product(product_id=item['product_id'], access_token=amazon_access_token, quantity=item['gift_wrap_quantity'])
+            assert 'message' in gift_res
+if original_promo:
+    promo_res = apis.amazon.apply_promo_code_to_cart(promo_code=original_promo, access_token=amazon_access_token)
+    assert 'message' in promo_res
+restored = apis.amazon.show_cart(access_token=amazon_access_token)
+assert {(i['product_id'], i['quantity'], i.get('gift_wrap_quantity', 0)) for i in restored['cart_items']} == {(i['product_id'], i['quantity'], i['gift_wrap_quantity']) for i in original_items}
+assert bool(restored.get('promo_code')) == bool(original_promo)
+if original_promo:
+    assert restored.get('promo_valid') == original_promo_valid
+
+[code-00069] def parse_current_ym(date_str):
+    month_map = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6, 'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12}
+    parts = [p.strip() for p in date_str.split(',')]
+    assert len(parts) == 3, date_str
+    month = month_map[parts[1].split()[0].lower()]
+    year = int(parts[2])
+    return year, month
+
+# After inspecting docs for amazon.show_payment_cards and phone.get_current_date_and_time:
+cards = apis.amazon.show_payment_cards(access_token=amazon_access_token)
+visa = [c for c in cards if c['card_name'].lower() == 'visa']
+if visa:
+    selected_payment_card_id = min(c['payment_card_id'] for c in visa)
+else:
+    assert len(visa) == 0
+    # Inspect amazon.show_account and supervisor.show_payment_cards for default_payment_card_id; record absence.
+    current_ym = parse_current_ym(apis.phone.get_current_date_and_time()['date'])
+    valid = [c for c in cards if (int(c['expiry_year']), int(c['expiry_month'])) >= current_ym]
+    assert valid
+    max_expiry = max((int(c['expiry_year']), int(c['expiry_month'])) for c in valid)
+    selected_payment_card_id = min(c['payment_card_id'] for c in valid if (int(c['expiry_year']), int(c['expiry_month'])) == max_expiry)
+assert selected_payment_card_id in {c['payment_card_id'] for c in cards}
+[code-00079] # Named multi-quantity product ID derivation (use with cart-preserving order template):
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+def exact_product_id(query, target):
+    products = []
+    page_index = 0
+    while True:
+        page = apis.amazon.search_products(query=query, page_index=page_index, page_limit=20)
+        assert isinstance(page, list), page
+        if not page:
+            break
+        products.extend(page)
+        page_index += 1
+    matches = [p for p in products if norm(p['name']) == norm(target)]
+    assert len(matches) == 1, (target, matches)
+    return matches[0]['product_id']
+
+requested_specs = [('Ascend Ultralight Hammock', 1), ('The Complete Mediterranean Cookbook', 3), ('Athleta Studio Wrap', 3)]
+requested_items = []
+for target, qty in requested_specs:
+    pid = exact_product_id(target, target)
+    p = apis.amazon.show_product(product_id=pid)
+    assert norm(p['name']) == norm(target), p['name']
+    assert p['inventory_quantity'] >= qty, (pid, p['inventory_quantity'], qty)
+    requested_items.append((pid, qty))
+# Use requested_items, not literal IDs, for add_product_to_cart, cart/order verification, and restoration.
+[code-00091] # Gift-wrap cost-comparison template with original-cart preservation.
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+
+# Exact main product verification.
+products = []
+page_index = 0
+while True:
+    page = apis.amazon.search_products(query='Philips Norelco OneBlade Pro', page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    products.extend(page)
+    page_index += 1
+main_matches = [p for p in products if norm(p['name']) == norm('Philips Norelco OneBlade Pro')]
+assert len(main_matches) == 1, main_matches
+main_pid = main_matches[0]['product_id']
+main_product = apis.amazon.show_product(product_id=main_pid)
+assert norm(main_product['name']) == norm('Philips Norelco OneBlade Pro')
+assert main_product['inventory_quantity'] >= 1
+
+# Snapshot original cart before using cart as a scratchpad.
+orig_cart = apis.amazon.show_cart(access_token=amazon_access_token)
+orig_items = [{'product_id': i['product_id'], 'quantity': i['quantity'], 'gift_wrap_quantity': i.get('gift_wrap_quantity', 0)} for i in orig_cart['cart_items']]
+orig_promo = orig_cart.get('promo_code')
+orig_promo_valid = orig_cart.get('promo_valid')
+
+# Option A: Amazon gift wrap.
+apis.amazon.add_product_to_cart(product_id=main_pid, access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+apis.amazon.add_gift_wrapping_to_product(product_id=main_pid, access_token=amazon_access_token, quantity=1)
+cart_a = apis.amazon.show_cart(access_token=amazon_access_token)
+option_a_total = cart_a['total_cost']
+assert any(i['product_id'] == main_pid and i['gift_wrap_quantity'] == 1 for i in cart_a['cart_items'])
+
+# Option B: separate wrapping paper.
+wrappers = []
+page_index = 0
+while True:
+    page = apis.amazon.search_products(product_type='gift wrap', page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    wrappers.extend(page)
+    page_index += 1
+valid_wrappers = []
+for w in wrappers:
+    text = norm(w.get('name', '') + ' ' + w.get('description', ''))
+    if w['inventory_quantity'] >= 1 and ('gift wrap' in text or 'wrapping paper' in text):
+        valid_wrappers.append(w)
+assert valid_wrappers
+wrapper = min(valid_wrappers, key=lambda x: (x['price'], x['product_id']))
+wrapper_pid = wrapper['product_id']
+wrapper_product = apis.amazon.show_product(product_id=wrapper_pid)
+assert wrapper_product['inventory_quantity'] >= 1
+apis.amazon.add_product_to_cart(product_id=main_pid, access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+apis.amazon.add_product_to_cart(product_id=wrapper_pid, access_token=amazon_access_token, quantity=1, clear_cart_first=False)
+cart_b = apis.amazon.show_cart(access_token=amazon_access_token)
+option_b_total = cart_b['total_cost']
+assert any(i['product_id'] == main_pid and i['gift_wrap_quantity'] == 0 for i in cart_b['cart_items'])
+assert any(i['product_id'] == wrapper_pid for i in cart_b['cart_items'])
+
+# Choose cheaper deterministically, rebuild only chosen option, then order and restore orig_items/orig_promo.
+if option_b_total < option_a_total:
+    chosen_total = option_b_total
+    chosen_items = [(main_pid, 1, 0), (wrapper_pid, 1, 0)]
+elif option_a_total < option_b_total:
+    chosen_total = option_a_total
+    chosen_items = [(main_pid, 1, 1)]
+else:
+    chosen_total = option_a_total
+    chosen_items = [(main_pid, 1, 1)]
+for idx, (pid, qty, gw) in enumerate(chosen_items):
+    apis.amazon.add_product_to_cart(product_id=pid, access_token=amazon_access_token, quantity=qty, clear_cart_first=(idx == 0))
+    if gw > 0:
+        apis.amazon.add_gift_wrapping_to_product(product_id=pid, access_token=amazon_access_token, quantity=gw)
+cart = apis.amazon.show_cart(access_token=amazon_access_token)
+assert cart['total_cost'] == chosen_total, (cart['total_cost'], chosen_total)
+# Use selected_payment_card_id and selected_address_id variables for place_order, then restore orig_items/orig_promo as in code-00066.
+[code-00096] # Amazon return workflow (inspect docs for all APIs before first call and maintain inspected_apis).
+import datetime
+def parse_current_date(date_str):
+    month_map = {'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6, 'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12}
+    parts = [p.strip() for p in date_str.split(',')]
+    assert len(parts) == 3, date_str
+    month = month_map[parts[1].split()[0].lower()]
+    day = int(parts[1].split()[1])
+    year = int(parts[2])
+    return datetime.date(year, month, day)
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+
+current_date = parse_current_date(apis.phone.get_current_date_and_time()['date'])
+week_start = current_date - datetime.timedelta(days=current_date.weekday())  # Monday convention; document alternative if needed.
+
+orders = []
+page_index = 0
+while True:
+    page = apis.amazon.show_orders(access_token=amazon_access_token, sort_by='-created_at', page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    orders.extend(page)
+    page_index += 1
+
+target = norm("Hanes Men's Tagless Crewneck Undershirt")
+keep_size = norm('extra-large')
+return_items = []
+keep_items = []
+for o in orders:
+    od = datetime.datetime.strptime(o['created_at'], '%Y-%m-%dT%H:%M:%S').date()
+    if od < week_start:
+        continue
+    for it in o['order_items']:
+        p = apis.amazon.show_product(product_id=it['product_id'])
+        if norm(p['name']) != target:
+            continue
+        before_returned = it.get('returned_quantity', 0)
+        remaining = it['ordered_quantity'] - before_returned
+        if norm(p['relative_size']) == keep_size:
+            keep_items.append((o['order_id'], it['product_id'], before_returned))
+        elif remaining > 0:
+            return_items.append((o['order_id'], it['product_id'], remaining, before_returned))
+
+assert keep_items, keep_items
+assert all(pid not in {r[1] for r in return_items} for _, pid, _ in keep_items)
+
+deliverers = apis.amazon.show_return_deliverers()
+assert isinstance(deliverers, list), deliverers
+ups = [d for d in deliverers if norm(d['name']) == 'ups']
+selected_deliverer_id = ups[0]['deliverer_id'] if ups else min(d['deliverer_id'] for d in deliverers)
+
+for order_id, product_id, qty, before_returned in return_items:
+    res = apis.amazon.initiate_return(order_id=order_id, product_id=product_id, deliverer_id=selected_deliverer_id, quantity=qty, access_token=amazon_access_token)
+    assert 'return_id' in res, res
+
+for order_id, product_id, qty, before_returned in return_items:
+    o = apis.amazon.show_order(order_id=order_id, access_token=amazon_access_token)
+    item = next(i for i in o['order_items'] if i['product_id'] == product_id)
+    assert item['returned_quantity'] == before_returned + qty, (order_id, product_id, item)
+for order_id, product_id, before_returned in keep_items:
+    o = apis.amazon.show_order(order_id=order_id, access_token=amazon_access_token)
+    item = next(i for i in o['order_items'] if i['product_id'] == product_id)
+    assert item['returned_quantity'] == before_returned, (order_id, product_id, item)
+# Call supervisor.complete_task() without answer for action tasks.
+[code-00105] # Task-local API-doc enforcement helper (use before any app call):
+inspected_apis = set()
+def inspect_api(app, api):
+    doc = apis.api_docs.show_api_doc(app_name=app, api_name=api)
+    inspected_apis.add((app, api))
+    return doc
+def ensure_inspected(app, api):
+    assert (app, api) in inspected_apis, (app, api)
+# Example: inspect_api('supervisor','show_account_passwords'); ensure_inspected('supervisor','show_account_passwords'); apis.supervisor.show_account_passwords()
+[code-00116] # Derive size from past t-shirt orders (orders must already be paginated):
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+tshirt_sizes = []
+for o in orders:
+    for it in o['order_items']:
+        p = apis.amazon.show_product(product_id=it['product_id'])
+        if norm(p['product_type']) == 't-shirt' or 't shirt' in norm(p['name']):
+            tshirt_sizes.append((o['created_at'], norm(p['relative_size'])))
+assert tshirt_sizes
+sizes = {sz for _, sz in tshirt_sizes}
+if len(sizes) == 1:
+    my_size = sizes.pop()
+else:
+    latest = max(tshirt_sizes, key=lambda x: x[0])
+    my_size = latest[1]
+[code-00123] Guarded API-call helper to prevent inspection/call mismatches (extends code-00105):
+inspected_apis = set()
+def inspect_api(app, api):
+    doc = apis.api_docs.show_api_doc(app_name=app, api_name=api)
+    inspected_apis.add((app, api))
+    return doc
+def ensure_inspected(app, api):
+    assert (app, api) in inspected_apis, (app, api)
+def guarded_call(app, api, fn, **kwargs):
+    if (app, api) not in inspected_apis:
+        inspect_api(app, api)
+    ensure_inspected(app, api)
+    return fn(**kwargs)
+# Example: cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+# If the API was inspected in a previous block, guarded_call still executes ensure_inspected in the current block before the first call.
+[code-00125] Corrected t-shirt size derivation and strict candidate filter (supersedes code-00116's hyphen bug):
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+tshirt_sizes = []
+for o in orders:
+    for it in o['order_items']:
+        p = apis.amazon.show_product(product_id=it['product_id'])
+        if p['product_type'] == 't-shirt' or norm(p['product_type']) == 't shirt' or 't shirt' in norm(p['name']):
+            tshirt_sizes.append((o['created_at'], norm(p['relative_size'])))
+assert tshirt_sizes
+sizes = {sz for _, sz in tshirt_sizes}
+my_size = sizes.pop() if len(sizes) == 1 else max(tshirt_sizes, key=lambda x: x[0])[1]
+assert my_size in ['extra-small', 'small', 'medium', 'large', 'extra-large']
+def is_true_tshirt(p):
+    text = norm(p.get('name', '') + ' ' + p.get('description', ''))
+    return (p['product_type'] == 't-shirt' or norm(p['product_type']) == 't shirt') and 't shirt' in text and 'undershirt' not in text
+# Use is_true_tshirt after show_product verification; derive selected_product_id programmatically.
+[code-00134] import datetime
+# Use after initializing inspected_apis, inspect_api, ensure_inspected, and guarded_call from code-00123.
+# Assume amazon_access_token was obtained after asserting exactly one amazon password match.
+def parse_current_date(date_str):
+    month_map = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,'july':7,'august':8,'september':9,'october':10,'november':11,'december':12}
+    parts = [p.strip() for p in date_str.split(',')]
+    assert len(parts) == 3, date_str
+    month = month_map[parts[1].split()[0].lower()]
+    day = int(parts[1].split()[1])
+    year = int(parts[2])
+    return datetime.date(year, month, day)
+def first_of_previous_month(d):
+    if d.month == 1:
+        return datetime.date(d.year - 1, 12, 1)
+    return datetime.date(d.year, d.month - 1, 1)
+def first_of_next_month(d):
+    if d.month == 12:
+        return datetime.date(d.year + 1, 1, 1)
+    return datetime.date(d.year, d.month + 1, 1)
+def order_date(created_at):
+    date_part = created_at.split('T')[0].split()[0]
+    y, m, d = [int(x) for x in date_part.split('-')]
+    return datetime.date(y, m, d)
+# 'this or the last calendar month' = union of previous and current calendar months.
+date_info = guarded_call('phone', 'get_current_date_and_time', apis.phone.get_current_date_and_time)
+assert isinstance(date_info, dict) and 'date' in date_info, date_info
+current_date = parse_current_date(date_info['date'])
+window_start = first_of_previous_month(current_date)
+window_end = first_of_next_month(current_date)
+assert window_start <= current_date < window_end, (window_start, current_date, window_end)
+orders = []
+page_index = 0
+while True:
+    page = guarded_call('amazon', 'show_orders', apis.amazon.show_orders, access_token=amazon_access_token, sort_by='-created_at', page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    orders.extend(page)
+    page_index += 1
+seen = set()
+unique_orders = []
+for o in orders:
+    if o['order_id'] not in seen:
+        seen.add(o['order_id'])
+        unique_orders.append(o)
+window_orders = []
+for o in unique_orders:
+    assert 'created_at' in o and 'paid_amount' in o, o
+    od = order_date(o['created_at'])
+    if window_start <= od < window_end:
+        assert isinstance(o['paid_amount'], (int, float)), o
+        window_orders.append(o)
+total_spend = round(sum(float(o['paid_amount']) for o in window_orders), 2)
+result = guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task, answer=total_spend)
+assert isinstance(result, dict) and 'message' in result, result
+[code-00137] # Requires inspected_apis, inspect_api, ensure_inspected, guarded_call from code-00123.
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+def get_password(passwords, app_name):
+    matching = [p for p in passwords if p['account_name'] == app_name]
+    assert len(matching) == 1, matching
+    return matching[0]['password']
+
+# supervisor_email is the user's email.
+gmail_password = get_password(passwords, 'gmail')
+gmail_login = guarded_call('gmail', 'login', apis.gmail.login, username=supervisor_email, password=gmail_password)
+assert isinstance(gmail_login, dict) and 'access_token' in gmail_login, gmail_login
+gmail_access_token = gmail_login['access_token']
+
+# Paginate inbox only if documented; otherwise call once.
+inbox_doc = inspect_api('gmail', 'show_inbox_threads')
+param_names = {p['name'] for p in inbox_doc.get('parameters', [])}
+threads = []
+if 'page_index' in param_names:
+    page_index = 0
+    while True:
+        kwargs = {'access_token': gmail_access_token, 'page_index': page_index}
+        if 'page_limit' in param_names:
+            kwargs['page_limit'] = 20
+        page = guarded_call('gmail', 'show_inbox_threads', apis.gmail.show_inbox_threads, **kwargs)
+        assert isinstance(page, list), page
+        if not page:
+            break
+        threads.extend(page)
+        page_index += 1
+else:
+    threads = guarded_call('gmail', 'show_inbox_threads', apis.gmail.show_inbox_threads, access_token=gmail_access_token)
+    assert isinstance(threads, list), threads
+
+# Replace subject/sender for other emailed checklist tasks.
+target_subject = norm('Get-together Shopping List')
+target_sender = norm('Jacob Blackburn')
+matches = [t for t in threads if norm(t.get('subject', '')) == target_subject and any(norm(p.get('name', '')) == target_sender for p in t.get('participants', []))]
+assert len(matches) == 1, matches
+email = None
+for eid in matches[0]['email_ids']:
+    candidate = guarded_call('gmail', 'show_email', apis.gmail.show_email, email_id=eid, access_token=gmail_access_token)
+    assert isinstance(candidate, dict), candidate
+    if candidate.get('attachments'):
+        email = candidate
+        break
+assert email is not None, matches[0]
+attachment_id = email['attachments'][0]['id']
+
+fs_password = get_password(passwords, 'file_system')
+fs_login = guarded_call('file_system', 'login', apis.file_system.login, username=supervisor_email, password=fs_password)
+assert isinstance(fs_login, dict) and 'access_token' in fs_login, fs_login
+fs_access_token = fs_login['access_token']
+
+download = guarded_call('gmail', 'download_attachment', apis.gmail.download_attachment, attachment_id=attachment_id, file_system_access_token=fs_access_token, access_token=gmail_access_token)
+assert isinstance(download, dict) and 'file_path' in download, download
+file_info = guarded_call('file_system', 'show_file', apis.file_system.show_file, file_path=download['file_path'], access_token=fs_access_token)
+assert isinstance(file_info, dict) and 'content' in file_info, file_info
+
+requested_specs = []
+for line in file_info['content'].split('\n'):
+    line = line.strip().lstrip('- ')
+    if not line or line.startswith('#'):
+        continue
+    parts = line.split(' X ', 1)
+    if len(parts) == 2 and parts[0].isdigit():
+        requested_specs.append((parts[1].strip(), int(parts[0])))
+assert requested_specs
+# Pass requested_specs to code-00079 exact_product_id workflow.
+[code-00142] # Email RSVP recipient count workflow (requires norm, guarded_call, gmail_access_token, threads):
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').replace(chr(39), '').split())
+event_terms = ['get together', 'sunday']
+event_matches = [t for t in threads if any(term in norm(t.get('subject', '')) for term in event_terms)]
+assert event_matches, event_matches
+# If multiple, read bodies and keep the thread whose organizer email matches the requested event/audience.
+event_thread = None
+event_emails = []
+for t in event_matches:
+    emails = []
+    for eid in t['email_ids']:
+        e = guarded_call('gmail', 'show_email', apis.gmail.show_email, email_id=eid, access_token=gmail_access_token)
+        assert isinstance(e, dict) and 'message' not in e, e
+        emails.append(e)
+    if any('sunday' in norm(e.get('body', '')) for e in emails):  # replace with task-specific event/audience terms
+        event_thread = t
+        event_emails = emails
+        break
+assert event_thread is not None, event_matches
+organizer_email = norm('ca-smit@gmail.com')
+yes_terms = ['will be there', 'i am in', 'sounds good', 'great idea', 'yes']
+no_terms = ['wont', 'cant', 'not able', 'sorry', 'have plans', 'already have']
+yes_senders = {}
+for e in event_emails:
+    sender_email = norm(e['sender']['email'])
+    if sender_email == organizer_email:
+        continue
+    body = norm(e['body'])
+    if any(t in body for t in yes_terms) and not any(n in body for n in no_terms):
+        yes_senders[sender_email] = e['sender']['name']
+assert yes_senders, event_emails
+num_recipients = len(yes_senders)
+# Use num_recipients for show_product inventory, add_product_to_cart(quantity=num_recipients), add_gift_wrapping_to_product(quantity=num_recipients), and cart/order assertions.
+[code-00156] # Email sender delivery address + strict category selection (requires norm, guarded_call, inspect_api, all_contacts, sender_email, amazon_access_token, requested_category, max_price):
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+def parse_contact_address(addr):
+    lines = [l.strip() for l in str(addr).split('\n') if l.strip()]
+    assert len(lines) >= 5, addr
+    return {'street_address': lines[0], 'city': lines[1], 'state': lines[2], 'country': lines[3], 'zip_code': lines[4]}
+sender_contacts = [c for c in all_contacts if norm(c.get('email', '')) == norm(sender_email)]
+if not sender_contacts:
+    sender_contacts = [c for c in all_contacts if any(rel.lower() in ('husband', 'spouse', 'partner') for rel in c.get('relationships', []))]
+assert len(sender_contacts) == 1, sender_contacts
+sender = sender_contacts[0]
+target_addr = parse_contact_address(sender['work_address'])
+addresses = guarded_call('amazon', 'show_addresses', apis.amazon.show_addresses, access_token=amazon_access_token)
+def addr_match(a):
+    return (norm(a['street_address']) == norm(target_addr['street_address']) and norm(a['city']) == norm(target_addr['city']) and norm(a['state']) == norm(target_addr['state']) and norm(a['country']) == norm(target_addr['country']) and str(a['zip_code']) == str(target_addr['zip_code']))
+matches = [a for a in addresses if addr_match(a)]
+if not matches:
+    inspect_api('amazon', 'add_address')
+    add_res = guarded_call('amazon', 'add_address', apis.amazon.add_address, access_token=amazon_access_token, name=sender['first_name'] + ' Work', street_address=target_addr['street_address'], city=target_addr['city'], state=target_addr['state'], country=target_addr['country'], zip_code=target_addr['zip_code'])
+    assert isinstance(add_res, dict), add_res
+    addresses = guarded_call('amazon', 'show_addresses', apis.amazon.show_addresses, access_token=amazon_access_token)
+    matches = [a for a in addresses if addr_match(a)]
+assert len(matches) == 1, matches
+selected_address_id = matches[0]['address_id']
+products = []
+page_index = 0
+while True:
+    page = guarded_call('amazon', 'search_products', apis.amazon.search_products, product_type=requested_category, max_price=max_price, page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    products.extend(page)
+    page_index += 1
+candidates = []
+for p in products:
+    if p['product_type'] != requested_category or p['price'] > max_price or p['inventory_quantity'] <= 0:
+        continue
+    full = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=p['product_id'])
+    assert isinstance(full, dict) and 'message' not in full, full
+    assert full['product_type'] == requested_category
+    candidates.append(full)
+assert candidates
+selected = max(candidates, key=lambda x: (x['rating'], -x['price'], x['product_id']))
+selected_product_id = selected['product_id']
+print(selected_product_id, selected['name'])
+[code-00165] # Emailed purchase quantity parser + block-local API preflight (requires inspected_apis, inspect_api, ensure_inspected from code-00123).
+WORD_NUM = {'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10}
+def clean_word(w): return ''.join(ch for ch in w.lower() if ch.isalnum())
+def parse_requested_quantity(body):
+    for w in str(body).lower().split():
+        cw = clean_word(w)
+        if cw.isdigit(): return int(cw)
+        if cw in WORD_NUM: return WORD_NUM[cw]
+    return 1
+requested_quantity = parse_requested_quantity(body)
+assert requested_quantity >= 1
+
+def preflight_apis(app_apis):
+    for app, api in app_apis:
+        inspect_api(app, api)
+        ensure_inspected(app, api)
+# Example before cart restoration block:
+preflight_apis([('amazon','show_product'),('amazon','add_product_to_cart'),('amazon','show_cart'),('amazon','add_gift_wrapping_to_product'),('amazon','apply_promo_code_to_cart'),('amazon','clear_cart')])
+[code-00172] def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').replace(chr(39), '').split())
+
+# Resolve sibling emails from authoritative Phone contacts.
+sibling_terms = ['sibling', 'brother', 'sister']
+sibling_emails = set()
+for c in all_contacts:
+    rels = [norm(r) for r in c.get('relationships', [])]
+    if c.get('email') and any(any(term in rel for term in sibling_terms) for rel in rels):
+        sibling_emails.add(norm(c['email']))
+assert sibling_emails, all_contacts
+
+# Select checklist thread/email programmatically.
+checklist_terms = ['camping', 'things needed', 'checklist', 'quantity of']
+candidate_threads = [t for t in threads if any(term in norm(t.get('subject', '')) for term in checklist_terms) and any(norm(p.get('email', '')) in sibling_emails for p in t.get('participants', []))]
+assert candidate_threads, candidate_threads
+checklist_email = None
+for t in candidate_threads:
+    for eid in t['email_ids']:
+        e = guarded_call('gmail', 'show_email', apis.gmail.show_email, email_id=eid, access_token=gmail_access_token)
+        assert isinstance(e, dict) and 'message' not in e, e
+        if norm(e['sender']['email']) == norm(supervisor_email) and any(term in norm(e.get('body', '')) for term in ['quantity of', 'checklist', 'things needed']):
+            checklist_email = e
+            break
+    if checklist_email:
+        break
+assert checklist_email is not None, candidate_threads
+checklist_email_id = checklist_email['email_id']
+
+import re
+checklist_items = []
+for m in re.finditer(r'-\s*(\d+)\s+quantity of ([^\n]+)', checklist_email['body']):
+    checklist_items.append((norm(m.group(2)), int(m.group(1))))
+assert checklist_items, checklist_email['body']
+
+committed = set()
+for t in candidate_threads:
+    for eid in t['email_ids']:
+        e = guarded_call('gmail', 'show_email', apis.gmail.show_email, email_id=eid, access_token=gmail_access_token)
+        assert isinstance(e, dict) and 'message' not in e, e
+        if e.get('response_to_email_id') == checklist_email_id and norm(e['sender']['email']) in sibling_emails:
+            body = norm(e['body'])
+            m = re.search(r'bring ([^.]+)', body)
+            if m:
+                for part in m.group(1).split(','):
+                    committed.add(norm(part))
+remaining = [(item, qty) for item, qty in checklist_items if item not in committed]
+assert remaining, (checklist_items, committed)
+# Pass remaining to exact product_type/inventory selection workflow.
+[code-00176] def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').replace(chr(39), '').split())
+def paginate_search(**kwargs):
+    products = []
+    page_index = 0
+    while True:
+        page = guarded_call('amazon', 'search_products', apis.amazon.search_products, page_index=page_index, page_limit=20, **kwargs)
+        assert isinstance(page, list), page
+        if not page:
+            break
+        products.extend(page)
+        page_index += 1
+    return products
+def select_best_checklist_item(item, qty):
+    raw = paginate_search(product_type=item) + paginate_search(query=item)
+    by_pid = {}
+    for p in raw:
+        by_pid[p['product_id']] = p
+    verified = []
+    for p in by_pid.values():
+        full = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=p['product_id'])
+        assert isinstance(full, dict) and 'message' not in full, full
+        text = norm(full.get('name', '') + ' ' + full.get('description', ''))
+        type_match = full.get('product_type') == item or norm(full.get('product_type', '')) == norm(item)
+        semantic_match = norm(item) in text
+        if (type_match or semantic_match) and full.get('inventory_quantity', 0) >= qty:
+            verified.append(full)
+    assert verified, (item, qty, len(by_pid))
+    best = max(verified, key=lambda x: (x['rating'], -x['price'], -x['product_id']))
+    return best['product_id'], qty, best['name'], best['rating'], best['inventory_quantity']
+selected_items = [select_best_checklist_item(item, qty) for item, qty in remaining]
+[code-00187] # Party gift purchase with named-weekday deadline, relationship invitee count, deterministic selection, and expected_delivery_at verification (requires guarded_call, norm, passwords, phone_access_token, amazon_access_token, all_contacts, selected_payment_card_id, selected_address_id):
+import datetime
+def parse_current_date(date_str):
+    month_map = {'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,'july':7,'august':8,'september':9,'october':10,'november':11,'december':12}
+    parts = [p.strip() for p in date_str.split(',')]
+    assert len(parts) == 3, date_str
+    month = month_map[parts[1].split()[0].lower()]
+    day = int(parts[1].split()[1])
+    year = int(parts[2])
+    return datetime.date(year, month, day)
+def next_weekday(current_date, target_weekday):
+    days = (target_weekday - current_date.weekday()) % 7
+    return current_date + datetime.timedelta(days=days)
+date_info = guarded_call('phone', 'get_current_date_and_time', apis.phone.get_current_date_and_time)
+assert isinstance(date_info, dict) and 'date' in date_info, date_info
+current_date = parse_current_date(date_info['date'])
+event_date = next_weekday(current_date, 5)  # Saturday; adjust target_weekday for other named weekdays
+if event_date == current_date:
+    delivery_deadline = current_date
+else:
+    delivery_deadline = event_date - datetime.timedelta(days=1)
+assert current_date <= delivery_deadline, (current_date, event_date, delivery_deadline)
+days_until_deadline = (delivery_deadline - current_date).days
+
+invitee_terms = ['friend', 'roommate']
+invitees = {}
+for c in all_contacts:
+    rels = [norm(r) for r in c.get('relationships', [])]
+    if any(any(term in rel for term in invitee_terms) for rel in rels):
+        invitees[c['contact_id']] = c
+num_invitees = len(invitees)
+assert num_invitees > 0, all_contacts
+
+raw = []
+for kwargs in [{'product_type': 'backpack', 'min_product_rating': 4.5}, {'query': 'backpack', 'min_product_rating': 4.5}]:
+    page_index = 0
+    while True:
+        page = guarded_call('amazon', 'search_products', apis.amazon.search_products, page_index=page_index, page_limit=20, **kwargs)
+        assert isinstance(page, list), page
+        if not page:
+            break
+        raw.extend(page)
+        page_index += 1
+by_pid = {p['product_id']: p for p in raw}
+verified = []
+for p in by_pid.values():
+    full = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=p['product_id'])
+    assert isinstance(full, dict) and 'message' not in full, full
+    text = norm(full.get('name', '') + ' ' + full.get('description', ''))
+    type_ok = full.get('product_type') == 'backpack' or norm(full.get('product_type', '')) == 'backpack'
+    bad_terms = ['tent', 'backpacking tent']
+    if type_ok and not any(b in text for b in bad_terms) and full['rating'] >= 4.5 and full['num_product_reviews'] >= 6 and full['inventory_quantity'] >= num_invitees and full['delivery_days'] <= days_until_deadline:
+        verified.append(full)
+assert verified, (len(by_pid), days_until_deadline)
+verified.sort(key=lambda x: (-x['rating'], x['price'], x['product_id']))
+selected = verified[0]
+selected_product_id = selected['product_id']
+
+orig_cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+orig_items = [{'product_id': i['product_id'], 'quantity': i['quantity'], 'gift_wrap_quantity': i.get('gift_wrap_quantity', 0)} for i in orig_cart['cart_items']]
+orig_promo = orig_cart.get('promo_code')
+orig_promo_valid = orig_cart.get('promo_valid')
+
+add_result = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart, product_id=selected_product_id, access_token=amazon_access_token, quantity=num_invitees, clear_cart_first=True)
+assert 'added to the cart' in add_result.get('message', '').lower(), add_result
+cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+assert len(cart['cart_items']) == 1 and cart['cart_items'][0]['product_id'] == selected_product_id and cart['cart_items'][0]['quantity'] == num_invitees, cart
+expected_total = cart['total_cost']
+
+order_result = guarded_call('amazon', 'place_order', apis.amazon.place_order, payment_card_id=selected_payment_card_id, address_id=selected_address_id, access_token=amazon_access_token)
+assert 'order_id' in order_result, order_result
+order = guarded_call('amazon', 'show_order', apis.amazon.show_order, order_id=order_result['order_id'], access_token=amazon_access_token)
+assert order['address_id'] == selected_address_id and order['payment_card_id'] == selected_payment_card_id and order['paid_amount'] == expected_total, order
+for oi in order['order_items']:
+    ed = str(oi['expected_delivery_at']).split('T')[0].split()[0]
+    y, m, d = [int(x) for x in ed.split('-')]
+    assert datetime.date(y, m, d) <= delivery_deadline, (oi, delivery_deadline)
+
+for item in orig_items:
+    p = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=item['product_id'])
+    assert p['inventory_quantity'] >= item['quantity'], (item, p)
+if not orig_items:
+    guarded_call('amazon', 'clear_cart', apis.amazon.clear_cart, access_token=amazon_access_token)
+else:
+    for idx, item in enumerate(orig_items):
+        res = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart, product_id=item['product_id'], access_token=amazon_access_token, quantity=item['quantity'], clear_cart_first=(idx == 0))
+        assert 'added to the cart' in res.get('message', '').lower(), res
+        if item['gift_wrap_quantity'] > 0:
+            gres = guarded_call('amazon', 'add_gift_wrapping_to_product', apis.amazon.add_gift_wrapping_to_product, product_id=item['product_id'], access_token=amazon_access_token, quantity=item['gift_wrap_quantity'])
+            assert 'message' in gres, gres
+if orig_promo:
+    pres = guarded_call('amazon', 'apply_promo_code_to_cart', apis.amazon.apply_promo_code_to_cart, promo_code=orig_promo, access_token=amazon_access_token)
+    assert 'message' in pres, pres
+restored = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+assert {(i['product_id'], i['quantity'], i.get('gift_wrap_quantity', 0)) for i in restored['cart_items']} == {(i['product_id'], i['quantity'], i['gift_wrap_quantity']) for i in orig_items}, restored
+assert bool(restored.get('promo_code')) == bool(orig_promo), restored
+if orig_promo:
+    assert restored.get('promo_valid') == orig_promo_valid, restored
+result = guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task)
+assert isinstance(result, dict) and 'message' in result, result
+print(result)
+[code-00192] from decimal import Decimal, ROUND_HALF_UP
+
+def half_up_whole(price, quantity):
+    return int((Decimal(str(price)) * Decimal(str(quantity))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+
+def norm(s):
+    return ' '.join(str(s or '').lower().replace('-', ' ').split())
+
+# Requires guarded_call, amazon_access_token, phone_access_token, all_contacts.
+wish_list = guarded_call('amazon', 'show_wish_list', apis.amazon.show_wish_list, access_token=amazon_access_token)
+assert isinstance(wish_list, list) and wish_list, wish_list
+
+husband_matches = [c for c in all_contacts if any(norm(rel) == 'husband' for rel in c.get('relationships', []))]
+assert len(husband_matches) == 1, husband_matches
+recipient_phone_number = husband_matches[0]['phone_number']
+assert recipient_phone_number, husband_matches[0]
+
+message_lines = []
+for item in wish_list:
+    assert isinstance(item, dict), item
+    product_name = item['product_name']
+    price = item['price']
+    quantity = item['quantity']
+    assert isinstance(product_name, str) and product_name.strip(), item
+    assert isinstance(price, (int, float)), item
+    assert isinstance(quantity, int) and quantity >= 1, item
+    message_lines.append(f"{product_name} => ${half_up_whole(price, quantity)}")
+assert len(message_lines) == len(wish_list)
+message = '\n'.join(message_lines)
+send_result = guarded_call('phone', 'send_text_message', apis.phone.send_text_message, access_token=phone_access_token, phone_number=recipient_phone_number, message=message)
+assert isinstance(send_result, dict) and 'message' in send_result, send_result
+[code-00194] No-Decimal half-up wishlist-to-text template (use when decimal is disallowed or module availability is uncertain):
+def half_up_whole_no_decimal(price, quantity):
+    s = str(price).strip()
+    if 'e' in s.lower():
+        total = float(s) * int(quantity)
+        return int(total + 0.5 + 1e-9)
+    sign = -1 if s.startswith('-') else 1
+    if sign < 0:
+        s = s[1:]
+    if '.' in s:
+        whole, frac = s.split('.', 1)
+    else:
+        whole, frac = s, ''
+    whole = whole or '0'
+    frac = frac.rstrip('0')
+    digits = whole + frac
+    scale = 10 ** len(frac)
+    value = int(digits or '0') * int(quantity)
+    return sign * int((2 * value + scale) // (2 * scale))
+
+# Requires wish_list from amazon.show_wish_list and recipient_phone_number from exact normalized wife contact.
+message_lines = []
+for item in wish_list:
+    product_name = item['product_name']
+    price = item['price']
+    quantity = item['quantity']
+    assert isinstance(product_name, str) and product_name.strip(), item
+    assert isinstance(price, (int, float)), item
+    assert isinstance(quantity, int) and quantity >= 1, item
+    message_lines.append(f'{product_name} => ${half_up_whole_no_decimal(price, quantity)}')
+assert len(message_lines) == len(wish_list)
+message = '\n'.join(message_lines)
+[code-00199] def coerce_whole_quantity(q):
+    assert isinstance(q, (int, float)), q
+    if isinstance(q, float):
+        assert q.is_integer(), q
+        q = int(q)
+    assert q >= 1, q
+    return q
+
+# Use with existing half_up_whole_no_decimal from code-00194 and guarded_call.
+message_lines = []
+for item in wish_list:
+    product_name = item['product_name']
+    price = item['price']
+    quantity = coerce_whole_quantity(item['quantity'])
+    assert isinstance(product_name, str) and product_name.strip(), item
+    assert isinstance(price, (int, float)), item
+    message_lines.append(f'{product_name} => ${half_up_whole_no_decimal(price, quantity)}')
+assert len(message_lines) == len(wish_list)
+message = '\n'.join(message_lines)
+send_result = guarded_call('phone', 'send_text_message', apis.phone.send_text_message, access_token=phone_access_token, phone_number=recipient_phone_number, message=message)
+assert isinstance(send_result, dict) and 'text_message_id' in send_result, send_result
+assert 'sent' in str(send_result.get('message', '')).lower(), send_result
+[code-00203] # Relationship-specified address resolution with existence-gated add_address (requires all_contacts from paginated phone.search_contacts, guarded_call, inspect_api, amazon_access_token):
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+def norm_zip(z):
+    s = str(z).strip()
+    if s.endswith('.0'):
+        s = s[:-2]
+    return s
+def parse_contact_address(addr):
+    lines = [l.strip() for l in str(addr).split('\n') if l.strip()]
+    assert len(lines) >= 5, addr
+    return {'street_address': lines[0], 'city': lines[1], 'state': lines[2], 'country': lines[3], 'zip_code': norm_zip(lines[4])}
+parent_rel_terms = {'parent', 'mother', 'father'}
+parent_contacts = []
+for c in all_contacts:
+    rels = {norm(r) for r in c.get('relationships', [])}
+    if rels & parent_rel_terms:
+        parent_contacts.append(c)
+assert parent_contacts, all_contacts
+addr_sets = {norm(c.get('home_address', '')) for c in parent_contacts}
+assert len(addr_sets) == 1, addr_sets
+target_addr = parse_contact_address(parent_contacts[0]['home_address'])
+addresses = guarded_call('amazon', 'show_addresses', apis.amazon.show_addresses, access_token=amazon_access_token)
+def addr_match(a):
+    return (norm(a['street_address']) == norm(target_addr['street_address']) and norm(a['city']) == norm(target_addr['city']) and norm(a['state']) == norm(target_addr['state']) and norm(a['country']) == norm(target_addr['country']) and norm_zip(a['zip_code']) == target_addr['zip_code'])
+matches = [a for a in addresses if addr_match(a)]
+if not matches:
+    inspect_api('amazon', 'add_address')
+    add_res = guarded_call('amazon', 'add_address', apis.amazon.add_address, access_token=amazon_access_token, name='Parents Home', street_address=target_addr['street_address'], city=target_addr['city'], state=target_addr['state'], country=target_addr['country'], zip_code=int(target_addr['zip_code']))
+    assert isinstance(add_res, dict) and 'message' in add_res, add_res
+    addresses = guarded_call('amazon', 'show_addresses', apis.amazon.show_addresses, access_token=amazon_access_token)
+    matches = [a for a in addresses if addr_match(a)]
+assert len(matches) == 1, matches
+selected_address_id = matches[0]['address_id']
+[code-00204] # Exact cart restoration comparison (use after restoring orig_items/orig_promo):
+restored = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+restored_tuples = sorted((i['product_id'], i['quantity'], i.get('gift_wrap_quantity', 0)) for i in restored['cart_items'])
+orig_tuples = sorted((i['product_id'], i['quantity'], i.get('gift_wrap_quantity', 0)) for i in orig_items)
+assert len(restored['cart_items']) == len(orig_items), (restored, orig_items)
+assert restored_tuples == orig_tuples, (restored_tuples, orig_tuples)
+if not orig_promo:
+    assert not restored.get('promo_code'), restored
+    assert not restored.get('promo_valid'), restored
+else:
+    assert restored.get('promo_code') == orig_promo, restored
+    assert restored.get('promo_valid') == orig_promo_valid, restored
+[code-00210] # Minimal final completion proof (requires inspect_api/guarded_call helpers; use only after all irreversible actions have succeeded but no USER output from supervisor.complete_task is visible; do not repeat place_order, add_product_to_cart, clear_cart, or cart restoration):
+inspect_api('supervisor', 'complete_task')
+result = guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task)
+assert isinstance(result, dict) and 'message' in result, result
+print(result)
+# For answer tasks, call guarded_call('supervisor','complete_task', apis.supervisor.complete_task, answer=answer). End the code block with triple backticks followed by a newline.
+[code-00217] # Split-delivery same-product template (requires guarded_call, amazon_access_token, selected_product_id, parents_address_id, my_home_address_id, selected_payment_card_id). Pre-inspect every API referenced in this block, including add_gift_wrapping_to_product even when a call uses gift_wrap_qty == 0.
+orig_cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+orig_items = [{'product_id': i['product_id'], 'quantity': i['quantity'], 'gift_wrap_quantity': i.get('gift_wrap_quantity', 0)} for i in orig_cart['cart_items']]
+orig_promo = orig_cart.get('promo_code')
+orig_promo_valid = orig_cart.get('promo_valid')
+def place_split_order(address_id, gift_wrap_qty):
+    p = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=selected_product_id)
+    assert p['inventory_quantity'] >= 1, p
+    res = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart, product_id=selected_product_id, access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+    assert 'added to the cart' in res.get('message', '').lower(), res
+    if gift_wrap_qty > 0:
+        gres = guarded_call('amazon', 'add_gift_wrapping_to_product', apis.amazon.add_gift_wrapping_to_product, product_id=selected_product_id, access_token=amazon_access_token, quantity=gift_wrap_qty)
+        assert 'message' in gres, gres
+    cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+    assert len(cart['cart_items']) == 1 and cart['cart_items'][0]['product_id'] == selected_product_id and cart['cart_items'][0]['quantity'] == 1 and cart['cart_items'][0].get('gift_wrap_quantity', 0) == gift_wrap_qty, cart
+    total = cart['total_cost']
+    order_result = guarded_call('amazon', 'place_order', apis.amazon.place_order, payment_card_id=selected_payment_card_id, address_id=address_id, access_token=amazon_access_token)
+    assert 'order_id' in order_result, order_result
+    order = guarded_call('amazon', 'show_order', apis.amazon.show_order, order_id=order_result['order_id'], access_token=amazon_access_token)
+    assert order['address_id'] == address_id and order['payment_card_id'] == selected_payment_card_id and order['paid_amount'] == total, order
+    oi = order['order_items'][0]
+    assert oi['product_id'] == selected_product_id and oi['ordered_quantity'] == 1 and oi.get('gift_wrap_quantity', 0) == gift_wrap_qty, order
+    return order_result['order_id']
+order1_id = place_split_order(parents_address_id, 1)
+order2_id = place_split_order(my_home_address_id, 0)
+# Restore orig_items/orig_promo using code-00066/code-00204 before completion.
+[code-00219] # Reusable credential helper (define once after passwords are fetched):
+def get_password(passwords, app_name):
+    assert isinstance(passwords, list), passwords
+    matching = [p for p in passwords if p.get('account_name') == app_name]
+    assert len(matching) == 1, matching
+    return matching[0]['password']
+# Use get_password(passwords, 'amazon'), get_password(passwords, 'phone'), etc. Never use next(...) for passwords.
+[code-00234] # Plural relationship audience identical gift split-order template (requires norm, norm_zip, parse_contact_address, guarded_call, preflight_apis, amazon_access_token, phone_access_token, all_contacts, selected_product_id, selected_payment_card_id). Use get_password from code-00219; never next(...) for passwords.
+preflight_apis([
+    ('amazon','show_addresses'),('amazon','add_address'),('amazon','show_cart'),
+    ('amazon','show_product'),('amazon','add_product_to_cart'),('amazon','add_gift_wrapping_to_product'),
+    ('amazon','place_order'),('amazon','show_order'),('amazon','clear_cart'),
+    ('amazon','apply_promo_code_to_cart'),('supervisor','complete_task')
+])
+
+audience_terms = {'sister'}  # replace with {'brother'}, {'friend'}, etc.
+audience = {}
+for c in all_contacts:
+    rels = {norm(r) for r in c.get('relationships', [])}
+    if rels & audience_terms:
+        audience[c['contact_id']] = c
+assert audience, all_contacts
+assert all(str(c.get('home_address', '')).strip() for c in audience.values()), audience
+num_recipients = len(audience)
+
+p = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=selected_product_id)
+assert isinstance(p, dict) and 'message' not in p, p
+assert p['inventory_quantity'] >= num_recipients, p
+
+addresses = guarded_call('amazon', 'show_addresses', apis.amazon.show_addresses, access_token=amazon_access_token)
+assert isinstance(addresses, list), addresses
+def addr_match(a, pa):
+    return (norm(a['street_address']) == norm(pa['street_address']) and
+            norm(a['city']) == norm(pa['city']) and
+            norm(a['state']) == norm(pa['state']) and
+            norm(a['country']) == norm(pa['country']) and
+            norm_zip(a['zip_code']) == norm_zip(pa['zip_code']))
+
+recipient_address_ids = {}
+for cid, c in audience.items():
+    pa = parse_contact_address(c['home_address'])
+    matches = [a for a in addresses if addr_match(a, pa)]
+    if not matches:
+        name = c['first_name'] + ' Home'
+        add_res = guarded_call('amazon', 'add_address', apis.amazon.add_address,
+            access_token=amazon_access_token, name=name,
+            street_address=pa['street_address'], city=pa['city'], state=pa['state'],
+            country=pa['country'], zip_code=int(pa['zip_code']))
+        assert isinstance(add_res, dict) and 'address_id' in add_res, add_res
+        addresses = guarded_call('amazon', 'show_addresses', apis.amazon.show_addresses, access_token=amazon_access_token)
+        matches = [a for a in addresses if addr_match(a, pa)]
+    assert len(matches) == 1, (cid, matches)
+    recipient_address_ids[cid] = matches[0]['address_id']
+assert len(set(recipient_address_ids.values())) == num_recipients, recipient_address_ids
+
+orig_cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+assert isinstance(orig_cart, dict) and 'cart_items' in orig_cart, orig_cart
+orig_items = [{'product_id': i['product_id'], 'quantity': i['quantity'], 'gift_wrap_quantity': i.get('gift_wrap_quantity', 0)} for i in orig_cart['cart_items']]
+orig_promo = orig_cart.get('promo_code')
+orig_promo_valid = orig_cart.get('promo_valid')
+
+order_ids = []
+for cid, address_id in recipient_address_ids.items():
+    p = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=selected_product_id)
+    assert p['inventory_quantity'] >= 1, p
+    res = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart,
+        product_id=selected_product_id, access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+    assert 'added to the cart' in res.get('message', '').lower(), res
+    gres = guarded_call('amazon', 'add_gift_wrapping_to_product', apis.amazon.add_gift_wrapping_to_product,
+        product_id=selected_product_id, access_token=amazon_access_token, quantity=1)
+    assert 'message' in gres, gres
+    cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+    assert len(cart['cart_items']) == 1, cart
+    assert cart['cart_items'][0]['product_id'] == selected_product_id, cart
+    assert cart['cart_items'][0]['quantity'] == 1, cart
+    assert cart['cart_items'][0].get('gift_wrap_quantity', 0) == 1, cart
+    total = cart['total_cost']
+    order_result = guarded_call('amazon', 'place_order', apis.amazon.place_order,
+        payment_card_id=selected_payment_card_id, address_id=address_id, access_token=amazon_access_token)
+    assert 'order_id' in order_result, order_result
+    order = guarded_call('amazon', 'show_order', apis.amazon.show_order,
+        order_id=order_result['order_id'], access_token=amazon_access_token)
+    assert order['address_id'] == address_id, order
+    assert order['payment_card_id'] == selected_payment_card_id, order
+    assert round(order['paid_amount'], 2) == round(total, 2), order
+    oi = order['order_items'][0]
+    assert oi['product_id'] == selected_product_id, order
+    assert oi['ordered_quantity'] == 1, order
+    assert oi.get('gift_wrap_quantity', 0) == 1, order
+    order_ids.append(order_result['order_id'])
+
+if not orig_items:
+    guarded_call('amazon', 'clear_cart', apis.amazon.clear_cart, access_token=amazon_access_token)
+else:
+    for idx, item in enumerate(orig_items):
+        p = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=item['product_id'])
+        assert p['inventory_quantity'] >= item['quantity'], (item, p)
+        res = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart,
+            product_id=item['product_id'], access_token=amazon_access_token, quantity=item['quantity'], clear_cart_first=(idx == 0))
+        assert 'added to the cart' in res.get('message', '').lower(), res
+        if item['gift_wrap_quantity'] > 0:
+            gres = guarded_call('amazon', 'add_gift_wrapping_to_product', apis.amazon.add_gift_wrapping_to_product,
+                product_id=item['product_id'], access_token=amazon_access_token, quantity=item['gift_wrap_quantity'])
+            assert 'message' in gres, gres
+if orig_promo:
+    pres = guarded_call('amazon', 'apply_promo_code_to_cart', apis.amazon.apply_promo_code_to_cart,
+        promo_code=orig_promo, access_token=amazon_access_token)
+    assert 'message' in pres, pres
+
+restored = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+restored_tuples = sorted((i['product_id'], i['quantity'], i.get('gift_wrap_quantity', 0)) for i in restored['cart_items'])
+orig_tuples = sorted((i['product_id'], i['quantity'], i['gift_wrap_quantity']) for i in orig_items)
+assert len(restored['cart_items']) == len(orig_items), (restored, orig_items)
+assert restored_tuples == orig_tuples, (restored_tuples, orig_tuples)
+if not orig_promo:
+    assert not restored.get('promo_code'), restored
+    assert not restored.get('promo_valid'), restored
+else:
+    assert restored.get('promo_code') == orig_promo, restored
+    assert restored.get('promo_valid') == orig_promo_valid, restored
+
+result = guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task)
+assert isinstance(result, dict) and 'message' in result, result
+print(result)
+[code-00242] Voice-message favorite-color parser + color-specific category selection (requires guarded_call, norm, paginate_search, phone_access_token, supervisor_name, recipient_name, recipient_phone, amazon_access_token, category):
+import re
+def norm(s): return ' '.join(str(s or '').lower().replace('-', ' ').split())
+voice_msgs = []
+page_index = 0
+while True:
+    page = guarded_call('phone', 'search_voice_messages', apis.phone.search_voice_messages, access_token=phone_access_token, phone_number=recipient_phone, page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    voice_msgs.extend(page)
+    page_index += 1
+q_matches = [m for m in voice_msgs if norm(m['sender']['name']) == norm(supervisor_name) and 'favorite color' in norm(m['message'])]
+assert len(q_matches) == 1, q_matches
+q_time = q_matches[0]['sent_at']
+replies = [m for m in voice_msgs if norm(m['sender']['name']) == norm(recipient_name) and m['sent_at'] > q_time]
+replies.sort(key=lambda x: x['sent_at'])
+assert replies, voice_msgs
+m = re.search(r'it is ([a-z]+)', norm(replies[0]['message']))
+assert m, replies[0]['message']
+favorite_color = m.group(1)
+assert favorite_color, favorite_color
+raw = paginate_search(product_type=category) + paginate_search(query=category)
+by_pid = {p['product_id']: p for p in raw}
+color_matches = []
+for p in by_pid.values():
+    full = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=p['product_id'])
+    assert isinstance(full, dict) and 'message' not in full, full
+    text = norm(full.get('name', '') + ' ' + full.get('description', ''))
+    if not (full.get('product_type') == category or norm(full.get('product_type', '')) == norm(category) or norm(category) in text):
+        continue
+    if norm(full.get('color', '')) == norm(favorite_color) and full['inventory_quantity'] >= 1:
+        color_matches.append(full)
+    else:
+        for v in full.get('variations', []):
+            if norm(v.get('color', '')) == norm(favorite_color):
+                vp = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=v['product_id'])
+                assert isinstance(vp, dict) and 'message' not in vp, vp
+                if norm(vp.get('color', '')) == norm(favorite_color) and vp['inventory_quantity'] >= 1:
+                    color_matches.append(vp)
+assert color_matches, (category, favorite_color)
+selected = max(color_matches, key=lambda x: (x['rating'], -x['price'], -x['product_id']))
+selected_product_id = selected['product_id']
+assert norm(selected['color']) == norm(favorite_color), selected
+[code-00251] Phone-message recommendation parser + category-constrained candidate selection (requires guarded_call, preflight_apis, norm, all_contacts, phone_access_token, amazon_access_token, task_category; use with cart-preserving order/restoration templates):
+preflight_apis([('phone','search_text_messages'),('amazon','search_products'),('amazon','show_product'),('amazon','show_cart'),('amazon','add_product_to_cart')])
+def exact_product_id(query, target):
+    products = []
+    page_index = 0
+    while True:
+        page = guarded_call('amazon', 'search_products', apis.amazon.search_products, query=query, page_index=page_index, page_limit=20)
+        assert isinstance(page, list), page
+        if not page:
+            break
+        products.extend(page)
+        page_index += 1
+    matches = [p for p in products if norm(p['name']) == norm(target)]
+    assert len(matches) == 1, (target, matches)
+    return matches[0]['product_id']
+sender_matches = [c for c in all_contacts if norm(c.get('first_name', '')) == 'david']
+assert len(sender_matches) == 1, sender_matches
+sender_phone = sender_matches[0]['phone_number']
+msgs = []
+page_index = 0
+while True:
+    page = guarded_call('phone', 'search_text_messages', apis.phone.search_text_messages, access_token=phone_access_token, phone_number=sender_phone, page_index=page_index, page_limit=20)
+    assert isinstance(page, list), page
+    if not page:
+        break
+    msgs.extend(page)
+    page_index += 1
+rec_terms = ['buy', 'recommend', 'cheaper', 'amazon']
+rec_msgs = [m for m in msgs if norm(m['sender']['phone_number']) == norm(sender_phone) and any(t in norm(m['message']) for t in rec_terms)]
+assert len(rec_msgs) == 1, rec_msgs
+rec_msg = rec_msgs[0]['message']
+product_names = [norm(q) for q in rec_msg.split(chr(39))[1::2] if norm(q)]
+assert product_names, product_names
+selection_rule = 'cheaper' if 'cheaper' in norm(rec_msg) else None
+candidates = []
+for target in product_names:
+    pid = exact_product_id(target, target)
+    p = guarded_call('amazon', 'show_product', apis.amazon.show_product, product_id=pid)
+    assert norm(p['name']) == target, p
+    text = norm(p.get('name', '') + ' ' + p.get('description', ''))
+    if p['inventory_quantity'] >= 1 and (not task_category or norm(task_category) in text):
+        candidates.append(p)
+assert candidates, (product_names, task_category)
+if len(candidates) == 1:
+    selected = candidates[0]
+else:
+    assert selection_rule == 'cheaper', selection_rule
+    orig_cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+    orig_items = [{'product_id': i['product_id'], 'quantity': i['quantity'], 'gift_wrap_quantity': i.get('gift_wrap_quantity', 0)} for i in orig_cart['cart_items']]
+    orig_promo = orig_cart.get('promo_code')
+    orig_promo_valid = orig_cart.get('promo_valid')
+    totals = []
+    for p in candidates:
+        res = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart, product_id=p['product_id'], access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+        assert 'added to the cart' in res.get('message', '').lower(), res
+        cart = guarded_call('amazon', 'show_cart', apis.amazon.show_cart, access_token=amazon_access_token)
+        assert len(cart['cart_items']) == 1 and cart['cart_items'][0]['product_id'] == p['product_id'], cart
+        totals.append((cart['total_cost'], p))
+    selected = min(totals, key=lambda x: (x[0], x[1]['product_id']))[1]
+    res = guarded_call('amazon', 'add_product_to_cart', apis.amazon.add_product_to_cart, product_id=selected['product_id'], access_token=amazon_access_token, quantity=1, clear_cart_first=True)
+    assert 'added to the cart' in res.get('message', '').lower(), res
+selected_product_id = selected['product_id']
+assert not task_category or norm(task_category) in norm(selected.get('name', '') + ' ' + selected.get('description', '')), selected
+## COMMON MISTAKES AND CORRECT STRATEGIES
+
+[cms-00010] Do not hardcode product IDs after visually inspecting API output. Derive selections programmatically from collected data, e.g. filter products where seller_id == best_seller_id and inventory_quantity > 0. Also do not rely only on product search to discover sellers when seller APIs exist; use show_seller/search_sellers as the authoritative source for seller ratings.
+[cms-00016] Do not hardcode payment_card_id or address_id after visually inspecting API output. Derive them programmatically from show_payment_cards and show_addresses by filtering for the requested card_name and address name, assert exactly one match (or use a deterministic tie-breaker), store selected_payment_card_id and selected_address_id in variables, and pass those variables to place_order.
+[cms-00025] Do not choose the lowest payment_card_id when the task does not specify a card. Cards may be expired. Derive selected_payment_card_id from show_payment_cards after filtering for non-expired cards: if current date is known, keep cards with (expiry_year, expiry_month) >= current date; if not, choose the latest expiry as a safe heuristic and assert it is not expired. Store the ID in a variable and pass it to place_order. If place_order fails with an expired-card error, re-derive a valid card programmatically; do not hardcode a replacement ID.
+[cms-00027] Do not substitute API-doc inspection for actual verification calls. Before adding selected products to the cart, call apis.amazon.show_product(product_id=pid) for every pid in selected_product_ids and assert the returned product fields (product_id, product_type, seller_id, rating, inventory_quantity, name, description) satisfy the task constraints; search_products output alone is not sufficient ground truth.
+[cms-00032] Do not skip API-doc inspection for seemingly simple verification/completion APIs such as amazon.show_product and supervisor.complete_task; call apis.api_docs.show_api_doc before their first use, even if related APIs were already inspected.
+[cms-00035] For wishlist purchases, do not manually copy product IDs from printed show_wish_list output into candidate_ids or assign selected_product_id = <literal> after visual inspection. Derive candidate_ids from the wishlist list by filtering product_name/category, then assign selected_product_id = selected['product_id'] after programmatic dimension/inventory/semantic filtering.
+[cms-00041] When no payment card is specified, do not pick the first card with max expiry. First confirm no current-date API exists via amazon/supervisor API descriptions, then compute max_expiry = max((expiry_year, expiry_month)), filter cards to that expiry, and apply a deterministic tie-breaker (e.g., min payment_card_id) before assigning selected_payment_card_id; assert exactly one selected card.
+[cms-00042] When no shipping address is specified, do not infer Home/Work from product category or item type. Inspect amazon.show_account API doc/response for a default address field; if present, derive selected_address_id from it. If no default address is available, choose a named address only via an explicit deterministic rule and assert exactly one match, recording the justification.
+[cms-00045] Do not limit default address/payment-card discovery to amazon.show_account. Also inspect supervisor API descriptions for account/profile APIs that may expose default address or payment-card information. If no default exists, record that fact, then use a deterministic fallback (e.g., max expiry then lowest payment_card_id; lowest address_id) and assert selected_payment_card_id is in show_payment_cards and selected_address_id is in show_addresses before place_order.
+[cms-00048] For Amazon review/Q&A evidence tasks, do not hardcode product_id after visually inspecting search_products output. Derive product_id programmatically by filtering search_products results for an exact target name, e.g. matches = [p for p in products if p['name'].lower() == target_name], and assert exactly one match. When the task says to trust only verified purchasers, collect only reviews with is_verified=True and answers with is_verified=True; ignore unverified reviews/answers even if they are more numerous or conflict. If multiple verified statements conflict, apply a deterministic tie-breaker such as most recent created_at, then mode, then lowest source id, and record the rule.
+[cms-00052] For Amazon evidence tasks, do not apply purchase/wishlist heuristics (rating/price/inventory/variations/wishlist fit). Lock to one exact normalized product_id: normalize names by lowercasing and replacing hyphens with spaces, assert exactly one match, confirm show_product name/description is the device itself, and reject cases/covers/bundles/accessories. Use only that product_id for reviews/questions/answers unless the task explicitly asks for all variations.
+[cms-00053] For attribute evidence, extract only statements with attribute context. For battery hours, require battery/power/charge/charging in the review text or in the question for an answer; parse hours only from that context. Do not scan for any hour mention and do not take the maximum numeric hour in unrelated text.
+[cms-00054] Do not use generic call_with_optional_token or try/except TypeError to guess whether access_token is required. Inspect each API doc and pass access_token only when required. After each evidence API call, assert the response has the expected type (list/dict) and does not contain an error/message failure before iterating.
+[cms-00060] Do not hardcode the final answer after visually inspecting printed evidence. For evidence tasks, compute the answer into a variable and call supervisor.complete_task(answer=answer) using that variable; if the complete_task schema expects a number and the derived value is whole, pass int(answer), otherwise pass the answer variable directly.
+[cms-00061] Treat code-00050's generic parse_hours as unsafe for attribute evidence because it scans any hour mention. For battery-hour or similar attribute tasks, use code-00057 or an equivalent context parser that requires the attribute keyword (e.g., battery/power/charge/charging) before parsing hours, and for Q&A pass both the question and answer so battery-related questions are considered.
+[cms-00063] When a task says 'use Discover if it's already in my account, otherwise use what I have in it', do not assume Discover exists or hardcode its payment_card_id. Programmatically filter show_payment_cards by card_name.lower() == 'discover'. If matches exist, select deterministically (e.g., min payment_card_id or assert exactly one); if none, apply the unspecified-card fallback after checking for a current-date API. Always assert selected_payment_card_id is in the cards list before place_order.
+[cms-00064] Do not restore cart state by mapping only product_id to quantity. Cart state includes per-item gift_wrap_quantity and cart-level promo_code/promo_valid. Snapshot the full original cart before mutation, then after ordering restore every item with exact quantity, reapply gift wrapping and promo code if present, and assert the restored cart_items and promo fields match the snapshot. If the original promo_code was null, verify the restored cart also has no active promo code.
+[cms-00071] Do not select a named address or card with next(...) without materializing matches. For Home/Work/Visa, create matching list, assert len(matches) == 1 or use deterministic tie-breaker; for conditional 'use X if present, otherwise fallback', assert len(matches) == 0 before fallback.
+[cms-00072] Before applying an unspecified-card expiry heuristic, inspect and query amazon.show_account and supervisor.show_payment_cards docs/responses for default_payment_card_id; if no default field exists, record that fact and then use authoritative current date or latest-expiry fallback.
+[cms-00078] For conditional named payment cards ('use HSBC/Discover/Visa if already in account'), presence alone is not sufficient before place_order. If show_payment_cards exposes expiry_year/expiry_month and phone.get_current_date_and_time is available, assert the selected named card is not expired; if it is expired, treat it as unusable and apply the unspecified-card fallback among valid cards using latest expiry then deterministic tie-breaker.
+[cms-00082] Do not hardcode current year/month after visually reading apis.phone.get_current_date_and_time() output. Parse the returned date string programmatically, e.g. current_ym = parse_current_ym(apis.phone.get_current_date_and_time()['date']), before filtering payment cards by expiry.
+[cms-00083] For cheapest auxiliary items, do not choose a product_id from printed search results by eye. Filter valid in-stock candidates, sort by price with a deterministic tie-breaker, assign selected_auxiliary_id = cheapest['product_id'], call show_product(selected_auxiliary_id), and use that variable in add_product_to_cart.
+[cms-00087] Do not infer absence of default_payment_card_id or default_address_id from API-doc response schemas alone. Before unspecified-card/address fallback, call amazon.show_account and supervisor.show_payment_cards/show_addresses (as applicable), assert the returned account/profile objects lack default fields, and record that absence; only then use current-date/latest-expiry and deterministic address fallback.
+[cms-00095] Do not use show_orders(query=...) alone to identify orders from 'this week'; query relevance can return unrelated historical orders. Paginate all orders with sort_by='-created_at', use an authoritative current date, explicitly define the week convention (e.g., Monday-to-current, Sunday-to-current, or rolling 7 days), record it, and filter by created_at >= window_start.
+[cms-00099] Do not hardcode final answers, message bodies, or recipient identifiers after visually reading API output. For answer tasks assign answer = selected_object['field'] (e.g., most_liked_song['title']) and call complete_task(answer=answer); for messaging tasks derive recipient_phone_number from search_contacts matches and reply_text from parsed note content, then pass those variables. If a parser returns empty, inspect the raw response schema and fix the parser; never manually type the expected value.
+[cms-00100] For contact/messaging tasks, resolve the recipient programmatically: paginate search_contacts if paginated, filter by normalized first/last name or explicit relationship, assert exactly one match (or apply a recorded deterministic tie-breaker), store matches[0]['phone_number'] in recipient_phone_number, and pass that variable to send_text_message. Never copy a phone number from printed contact output.
+[cms-00101] Do not assume a single API response is complete for list endpoints outside Amazon evidence. Check docs for page_index/page_limit and paginate until an empty page for phone.search_contacts, phone.search_text_messages, simple_note.search_notes, spotify.show_playlist_library, and similar list APIs; assert each page is a list and not an error dict before extending.
+[cms-00107] Do not mix normalized text with raw hyphenated substrings. If norm() lowercases and replaces hyphens with spaces, search only for normalized terms (e.g., 't shirt') or, preferably, use exact normalized equality: norm(product['name']) == norm(target). For Amazon return tasks involving a named product, classify items by exact normalized product name and normalized relative_size, not by keyword fragments that can produce false negatives or false positives.
+[cms-00111] Do not use next(...) to select account passwords without asserting uniqueness. For supervisor.show_account_passwords, build matching = [item for item in passwords if item['account_name'] == app_name], assert len(matching) == 1 (or record deterministic tie-breaker), then password = matching[0]['password']; pass that variable to login.
+[cms-00112] For apparel category purchases, product_type alone can include adjacent subcategories (e.g., product_type 't-shirt' may include undershirts). Apply explicit semantic include/exclude terms from the task: if 't-shirt' means outer shirt, exclude 'undershirt' unless allowed; otherwise prefer candidates whose normalized name/description match the requested category and record the rule before deterministic selection.
+[cms-00118] Do not treat inspect_api as sufficient for API-doc compliance. Every first API call must be immediately preceded in the same code block by ensure_inspected(app, api); docs inspected in earlier blocks do not count. Before executing a block, scan all apis.<app>.<api>( calls and add ensure_inspected for each first use, including amazon.show_orders, show_product, search_products, evidence APIs, show_cart, add_product_to_cart, place_order, show_order, clear_cart, and supervisor.complete_task.
+[cms-00120] Do not validate API responses only with isinstance(dict/list). After show_product assert no failure message and required keys product_id, product_type, name, relative_size, inventory_quantity; after show_cart assert cart_items and total_cost; after show_order assert order_id/address_id/payment_card_id/order_items/paid_amount; after evidence pages assert list and no error dict before extending.
+[cms-00122] Do not use ensure_inspected as an inspection call. ensure_inspected only asserts that (app, api) is already in inspected_apis; it does not call show_api_doc or add the tuple. If the assertion fails, call inspect_api(app, api) first, then ensure_inspected, then the API. For APIs inspected in an earlier block, still call ensure_inspected immediately before the first actual call in the current block, or use a guarded_call helper that performs this check mechanically.
+[cms-00124] Do not compare normalized hyphenated Amazon category values to raw hyphenated strings. norm('t-shirt') becomes 't shirt', so `norm(product_type) == 't-shirt'` is always false. For t-shirt tasks, use raw equality `product_type == 't-shirt'` or normalized equality `norm(product_type) == 't shirt'`; apply the same rule to relative_size and product names.
+[cms-00128] Do not sum monetary API fields without validation or rounding: after show_orders, assert paid_amount is present and numeric, deduplicate orders by order_id, and round the final total to 2 decimals before complete_task. Do not rely on visual order counts or include duplicate pagination rows.
+[cms-00131] Do not index login_result['access_token'] or date_info['date'] without first asserting the response is a dict and contains the key; malformed responses should fail with a clear assertion, not KeyError. This applies before using credentials or authoritative dates for spend aggregation.
+[cms-00133] Do not treat bootstrap api_docs APIs as missing inspected_apis entries. inspected_apis/ensure_inspected/guarded_call enforcement applies to app APIs such as supervisor.show_account_passwords, amazon.login, phone.get_current_date_and_time, amazon.show_orders, and supervisor.complete_task. Do not call apis.api_docs.show_api_doc on api_docs.show_app_descriptions, api_docs.show_api_descriptions, or api_docs.show_api_doc; use them directly as documentation bootstrap.
+[cms-00136] Do not treat gmail.show_inbox_threads as a single-page list or hardcode email_id/attachment_id from printed output. Paginate inbox threads when documented, select the relevant thread by normalized subject/sender, derive email_id and attachment_id programmatically, then download and read the attachment. Do not parse checklist items by eye; convert file content into requested_specs = [(name, quantity), ...] with assertions, and use those variables for Amazon product resolution.
+[cms-00144] Do not end a task after only inspecting supervisor.complete_task or emitting a final code block without observed success. The final block must execute guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task) (or with answer), assert the returned dict contains 'message', print it, and end with ``` followed by a newline. If no execution output is shown, reissue the completion call.
+[cms-00149] Do not let the presence of an authoritative current-date API bypass default payment-card discovery. For unspecified-card purchases, first inspect/call supervisor.show_payment_cards (and amazon.show_account) to check for default_payment_card_id; if no default field is present, record that absence, then use phone.get_current_date_and_time to filter non-expired Amazon cards and choose latest expiry with a deterministic tie-breaker.
+[cms-00153] Do not accept adjacent product_type for an explicitly requested category merely because name/description contains the category term. For 'office chair', require product_type == 'office chair' unless the task explicitly allows adjacent categories; exclude gaming chair, dining chair, etc. Build candidates programmatically, verify with show_product, then assign selected_product_id = selected['product_id'] using deterministic key (e.g., highest rating, then lower price, then lower product_id). Never copy a printed product_id into later code.
+[cms-00154] Do not rely on guarded_call's lazy inspection to satisfy pre-block inspection for conditional cart-restoration APIs. Before executing any block containing conditional calls such as add_gift_wrapping_to_product or apply_promo_code_to_cart, explicitly inspect_api for every API referenced in those branches, even if the branch is false; guarded_call may inspect at call time, but the hard rule requires inspection before block execution.
+[cms-00159] Do not pass API-call kwargs into inspect_api. inspect_api(app, api) only accepts the app and api names; calling inspect_api(amazon, add_product_to_cart, product_id=..., access_token=...) raises TypeError and can leave the API unregistered, causing ensure_inspected to fail. Use guarded_call(app, api, fn, **kwargs), or inspect_api(app, api); ensure_inspected(app, api); then call the API.
+[cms-00160] Do not decide an Amazon address is missing by visually comparing printed show_addresses output. Build target_addr from the sender contact record, programmatically filter amazon.show_addresses with normalized street/city/state/country/zip equality, and call add_address only if matches is empty; after adding, re-fetch show_addresses and derive selected_address_id from the programmatic match.
+[cms-00163] Do not place inspect_api calls for conditional APIs inside the conditional branch. If the branch is false, the API is never inspected. At the top of every code block, pre-inspect every app API referenced anywhere in the block, including false branches and restoration APIs such as add_gift_wrapping_to_product and apply_promo_code_to_cart; then call ensure_inspected immediately before each first call in that same block.
+[cms-00169] Do not hardcode relevant_thread_ids or checklist_email_id after visually reading Gmail output. Build them from normalized subject/body/participants and assert uniqueness; if multiple candidate threads exist, read emails and keep the one whose body contains checklist markers and whose replies are response_to_email_id. Do not treat email participants as proof of sibling/family relationships.
+[cms-00175] Do not select checklist items using only search_products(product_type=item) and exact product_type equality. Amazon category labels may differ from checklist wording. For each remaining item, union paginated search_products(product_type=item) and search_products(query=item), deduplicate by product_id, verify candidates with show_product, accept if product_type matches or normalized name/description semantically contains the item, filter inventory_quantity >= requested_quantity, then choose highest product rating with deterministic tie-breakers.
+[cms-00180] Do not emit bare apis.amazon.clear_cart in a cart-restoration block even if clear_cart was inspected earlier. Use guarded_call('amazon', 'clear_cart', apis.amazon.clear_cart, access_token=amazon_access_token) or inspect_api/ensure_inspected immediately before the first call in that same block; the same applies to add_product_to_cart, show_cart, gift-wrap, and promo APIs during restoration.
+[cms-00181] Do not interpret 'verify selected products' as verifying every Amazon search candidate. For checklist item selection with many candidates, verify only the deterministic top candidate(s) with show_product; if a candidate fails inventory/type/name checks, move to the next top-K candidate. Never respond to a request-limit error by hardcoding a product_id from printed output.
+[cms-00185] Do not select verified[0] as the chosen product unless the verified list has been explicitly sorted by a deterministic key. After filtering candidates, sort by a recorded key (e.g., rating descending, price ascending, product_id ascending) and assign selected_product_id = sorted_candidates[0]['product_id']; assert the selected item satisfies all constraints. This prevents arbitrary selection when multiple qualifying products exist.
+[cms-00190] Do not resolve a singular relationship such as 'husband' by substring matching normalized relationships; 'ex-husband' or similar labels can match. Use exact normalized equality (norm(rel) == 'husband') or the documented relationship filter, and assert exactly one contact with a non-empty phone_number. If substring matching is unavoidable, explicitly exclude ex-husband/ex-spouse/ex-partner.
+[cms-00195] For irreversible messaging tasks, do not resend a text message when only completion is unproven. If `phone.send_text_message` has returned a success dict, treat the send as done; if `supervisor.complete_task` was emitted but no observed USER output is available, reissue only a minimal final block that calls `guarded_call('supervisor', 'complete_task', apis.supervisor.complete_task)` (no answer for action tasks), asserts the result dict contains `message`, and prints it. Do not re-fetch the wishlist, rebuild the message, or re-run send_text_message unless required variables are missing.
+[cms-00201] Do not restore cart state with set equality or only product_id->quantity mapping. Use sorted lists of (product_id, quantity, gift_wrap_quantity) and assert len(restored['cart_items']) == len(orig_items). If the original cart had no gift wrap, assert every restored item has gift_wrap_quantity == 0; if the original promo_code was None/empty, assert restored promo_code is None/empty and promo_valid is false/None.
+[cms-00211] Do not decide the block-local preflight list from runtime data. Even if gift_wrap_quantity == 0 and promo_code is None, any guarded_call('amazon','add_gift_wrapping_to_product',...) or guarded_call('amazon','apply_promo_code_to_cart',...) appearing in the block source must be inspected before execution; false branches never call guarded_call.
+[cms-00215] Do not fulfill 'deliver one to parents' home and one to my home' with a single quantity-2 order or by assuming per-item addresses/wrapping in one order. Derive parents_address_id from relationship contacts and my_home_address_id from exact normalized Amazon address name 'home', assert the IDs are distinct, then place two orders and assert each order's address_id and gift_wrap_quantity.
+[cms-00223] Do not resolve 'mother's home' (or 'father's home') by accepting generic 'parent' or substring matches. Match exact normalized relationship labels such as 'mother' (or documented synonym 'mom') and use that contact's home_address; if multiple contacts match, assert identical home_address values or apply a recorded deterministic rule. For 'my home', use the saved Amazon address named 'Home' rather than the relationship contact's address.
+[cms-00228] Do not apply the 'all relationship home addresses must be identical' rule to tasks that require separate deliveries to each audience member. For 'each sibling's home', treat differing home addresses as required separate orders; only use the identical-address consistency rule when the task names a single shared location (e.g., parents' home).
+[cms-00230] Do not resolve plural relationship audiences such as 'brothers' or 'sisters' by substring matching normalized relationships; 'brother-in-law', 'step-brother', or similar labels may be included. Use exact normalized relationship labels ('brother', 'sister') unless the task explicitly includes in-law/step, or apply explicit exclusions. Assert the resulting audience is non-empty and deduplicate by contact_id.
+[cms-00238] Do not add a literal post-selection assertion such as assert selected_product_id == 144 after programmatically selecting a product. This hardcodes an observed ID and can fail if the environment changes. Instead assert selected satisfies all constraints (category, color, inventory, rating == max rating among candidates), and use the selected variable in cart/order code.
+[cms-00243] Do not treat a color_available boolean as sufficient for color-specific purchases. If the requested color appears only in a parent product's variations, select the variation product_id and assert show_product(selected_product_id)['color'] equals the requested color before add_product_to_cart; never order the parent product whose main color differs. Also do not discard query candidates after a product_type search for color-specific category purchases; union product_type and query, deduplicate, and verify semantic category plus authoritative color.
+[cms-00252] Do not manually copy product names or IDs from printed phone messages, and do not treat a user task category such as 'food scale' as optional when the message offers two alternatives. Parse the message into product_names and selection_rule variables, resolve each quoted name programmatically, and assert the final selected product satisfies the requested category (unless the message explicitly overrides it). If only one quoted candidate satisfies the category, select it; if multiple do, apply the parsed cheaper rule using complete cart totals.
+## PROBLEM-SOLVING HEURISTICS AND WORKFLOWS
+[psw-00002] Remember you can use the variables in your code in subsequent code blocks.
+[psw-00007] Many APIs return items in "pages". Make sure to run through all the pages by looping over `page_index`.
+
+## VERIFICATION CHECKLIST
+
+[vc-00012] Before irreversible purchase actions, verify: (1) selected product via show_product(product_id=...) has expected product_type and seller_id; (2) payment card via show_payment_cards has card_name matching requested card; (3) address via show_addresses has name matching requested address; (4) cart via show_cart contains only intended product; (5) after place_order, show_order(order_id=...) confirms address_id, payment_card_id, and ordered product. Check API docs for show_cart and show_order even if they seem common.
+[vc-00018] Before irreversible purchase actions, add defensive assertions: winning-seller candidate list is non-empty; selected product has expected product_type, seller_id, and inventory_quantity > 0; API responses do not contain failure messages; payment card and address filters return exactly one requested match; cart contains only selected_product_id; final order uses selected_product_id, selected_payment_card_id, and selected_address_id variables.
+[vc-00021] For marketplace category purchases, do not trust product_type alone because listings can be mislabeled. Before irreversible purchase, filter/assert that the selected product's name/description semantically match the requested category and exclude obvious mismatches (e.g., for 'portable air conditioner', require 'air conditioner' and reject 'tv'/'television'). Apply this semantic filter before product rating/price tie-breakers.
+[vc-00022] Assert exact cart and order quantities: after add_product_to_cart, show_cart must have len(cart['cart_items']) == 1, item['product_id'] == selected_product_id, and item['quantity'] == 1; after place_order, show_order must have len(order['order_items']) == 1, item['product_id'] == selected_product_id, and item['ordered_quantity'] == 1.
+[vc-00026] For multi-item purchases, derive selected_product_ids from the qualifying product list and use that list for show_product, add_product_to_cart, cart, and order verification. If the task says items need not be identical, prefer N distinct qualifying products with quantity 1 each when available. Add the first product with clear_cart_first=True and subsequent products with clear_cart_first=False. Assert cart has len(cart_items)==N, product_id set equals selected_product_ids, and each quantity==1; assert order has len(order_items)==N and each ordered_quantity==1.
+[vc-00028] For category-count purchases, apply the strictest requested category term first (e.g., require 'laundry hamper' for laundry hampers) and reject adjacent categories (e.g., 'laundry sorter') unless show_product description explicitly identifies the item as a hamper. If fewer than N strict matches remain after authoritative seller/product rating and inventory checks, broaden with safe related query terms (e.g., laundry basket, hamper), reapply product_type and semantic validation, and only then consider borderline items; never loosen semantics merely to reach N.
+[vc-00029] Assert success for cart/order mutations instead of only printing responses: after each add_product_to_cart, require a success message such as 'added to the cart' and no failure message; after place_order, require order_id and a success message before show_order. Then verify show_order address_id, payment_card_id, product_id set, and ordered_quantity exactly match the selected values.
+[vc-00033] For category-count purchases with rating thresholds, build a complete candidate set by unioning paginated search_products(product_type=...) and search_products(query=...) results, deduplicate by product_id, apply min_product_rating/min_seller_rating filters, then filter by authoritative seller rating, product rating, inventory, and semantic match before selecting N distinct products; if fewer than N remain, enumerate candidate sellers via search_sellers/show_product_feature_choices and search by seller_id before broadening semantics.
+[vc-00037] For physical-fit purchases, assert selected product programmatically: inventory_quantity > 0; length/width satisfy countertop limits with <= (allow equality; use epsilon only for floating-point comparisons); if orientation is not fixed, accept swapped dimensions. If variations can affect size, inspect each variation's show_product dimensions and filter; if variations are not allowed, restrict to wishlist product_ids. Choose deterministically among fitting products (e.g., lowest price, then highest rating, then lowest product_id).
+[vc-00040] For wishlist physical-fit purchases, before irreversible actions assert: selected_product_id is in the original show_wish_list product_ids; show_product(product_id=selected_product_id)['product_type'] matches the requested category (e.g., 'cutting board'); inventory_quantity > 0; and authoritative length/width fit the constraint with swapped orientation allowed. Do not rely only on product_name matching.
+[vc-00049] Before answering an Amazon evidence task, assert: (1) product_id was derived programmatically from search_products by exact name match; (2) optional show_product(product_id=...) confirms the selected product name/type; (3) all review and answer pages were fetched with while True pagination; (4) every extracted statement came from a source with is_verified=True; (5) no unverified conflicting statement was used; (6) supervisor.complete_task API doc was inspected and the answer type matches the schema. For questions phrased as 'How many hours', prefer returning the numeric value, e.g. 4, unless the complete_task schema or task explicitly requires a string with units.
+[vc-00055] Before answering an Amazon attribute-evidence task, assert: (1) one exact normalized product_id was selected and no variation product_ids were used; (2) all reviews/answers are is_verified=True; (3) every extracted value has attribute context or comes from an attribute-related question; (4) the final answer uses one explicit deterministic rule (e.g., latest created_at then lowest source_id; use mode only if timestamps are missing) and not a tautological mode/latest combination; (5) complete_task schema was inspected and numeric answer type matches it.
+[vc-00059] For Amazon evidence/search pagination, after every call to search_products, show_product_reviews, show_product_questions, or show_product_question_answers, assert that the page is a list and not an error dict (e.g., {'message': ...}); if the response is a dict or contains a failure message, stop and diagnose instead of extending the collected evidence.
+[vc-00065] For multi-item orders with explicitly named products, derive selected_product_ids from separate exact-match variables and assert exactly one normalized match per requested product (e.g., assert len(ps5_matches) == 1; selected_product_ids = [ps5_matches[0]['product_id'], scale_matches[0]['product_id'], xbox_matches[0]['product_id']]). Never replace these with literals copied from printed output. Before place_order, show_product each selected id, assert normalized name and inventory, and assert cart product_id set equals selected_product_ids with quantity 1; after show_order, assert order product_id set and ordered_quantity match the same variables.
+[vc-00073] For multi-quantity named-product orders, build requested_items = [(product_id, requested_quantity), ...]; assert show_product(product_id)['inventory_quantity'] >= requested_quantity for each; add exact quantity; assert cart and show_order have identical (product_id, quantity/ordered_quantity) sets.
+[vc-00074] After place_order, verify financial state: compare pre-order show_cart total_cost or expected sum(price * ordered_quantity + tax + delivery_fee + gift_wrap_fee - discount) with show_order paid_amount; assert address_id, payment_card_id, and order_items match selected values before restoring cart.
+[vc-00075] Before restoring a snapshot cart, call show_product for each original cart item and assert inventory_quantity >= original quantity; if an item is unavailable, diagnose before continuing.
+[vc-00084] For gift-wrap cost-comparison orders, before place_order assert: Option A cart has the main item gift_wrap_quantity equal to the intended quantity and option_a_total saved; Option B cart has the main item gift_wrap_quantity == 0 and the selected auxiliary wrapper present with option_b_total saved; assert chosen_total < other_total or apply a recorded deterministic tie-breaker; after place_order assert paid_amount equals chosen_total and order_items product_id set equals the selected main/auxiliary product_id variables.
+[vc-00097] Before irreversible initiate_return, assert: (1) the date window convention is explicit and orders were filtered by created_at, not query relevance; (2) return_items/keep_items were built programmatically from show_orders and show_product; (3) quantity_to_return = ordered_quantity - returned_quantity > 0; (4) the keep-size product_id is absent from return_items; (5) deliverer_id was selected from show_return_deliverers. After returns, assert show_order returned_quantity increased by exactly quantity_to_return for each returned item and remained unchanged for kept items.
+[vc-00104] Before irreversible initiate_return, additionally assert: show_return_deliverers returned a non-empty list; if the preferred deliverer is absent, record the deterministic fallback and assert selected_deliverer_id is in the deliverer list; every return item's normalized relative_size != keep_size and every keep item's normalized relative_size == keep_size; show_product responses contain product_id, name, and relative_size; and verification comparisons use derived variables/sets (e.g., keep_pids = {pid for _, pid, _ in keep_items}) rather than literal IDs.
+[vc-00113] Before place_order, store expected_total = cart['total_cost'] in a variable; after show_order assert order['paid_amount'] == expected_total. Never assert a literal amount copied from printed cart output.
+[vc-00119] For evidence-constrained category purchases, build the candidate universe before evidence: union paginated search_products(product_type=category, relative_size=my_size) and search_products(query=category, relative_size=my_size), dedupe by product_id, filter inventory_quantity > 0, and call show_product for each candidate (or at least selected) asserting product_type/name/relative_size/inventory_quantity. Compute clean_candidates only from these verified in-stock candidates; never select from raw search results before inventory verification.
+[vc-00127] For Amazon calendar-year spend aggregation: derive the current year from apis.phone.get_current_date_and_time()['date']; define 'this calendar year' as Jan 1-Dec 31 of that year; paginate amazon.show_orders with sort_by='-created_at' and no query; deduplicate orders by order_id; assert every order has created_at and numeric paid_amount; filter by created_at year; compute total_spend = round(sum(float(o['paid_amount']) for o in this_year_orders), 2); inspect supervisor.complete_task and pass total_spend as a numeric answer. Use guarded_call or ensure_inspected in the same block for show_orders and complete_task.
+[vc-00138] For email-checklist purchases, before irreversible actions assert: (1) inbox threads were paginated if supported and the selected email/attachment IDs were derived from normalized subject/sender; (2) attachment content was downloaded and parsed into requested_specs; (3) every requested_specs item resolved to exact product_id with inventory_quantity >= requested quantity; (4) original cart snapshot was restored; (5) supervisor.complete_task was inspected and called via guarded_call/ensure_inspected in the final block, even for no-answer action tasks.
+[vc-00143] For event-date purchases such as 'this Sunday night', compute the upcoming event date from apis.phone.get_current_date_and_time()['date'] using a recorded weekday convention (e.g., next Sunday = (6 - weekday) % 7, with today treated as the event day only if the event is later today), then assert product.delivery_days <= days_until_event or expected_delivery_at <= event_date before ordering; if infeasible, diagnose rather than ignore the timing constraint. For N identical gift-wrapped items, assert cart item quantity == N, gift_wrap_quantity == N, and order item ordered_quantity == N, gift_wrap_quantity == N; do not wrap only one unit.
+[vc-00147] For email RSVP purchase quantity, do not select the event thread by subject alone when multiple get-together/event threads exist. Assert the chosen thread's body explicitly contains the requested event day/time and RSVP instruction, and that the organizer email matches the supervisor email; then parse replies by normalized sender email, exclude the organizer, deduplicate, and set quantity = len(yes_senders).
+[vc-00150] For event-date purchases, after place_order and show_order, parse each order_item['expected_delivery_at'] date portion (before 'T' or whitespace) and assert it is <= the computed event_date; for multi-unit gift orders assert the main gift item(s) satisfy this. Pre-order delivery_days <= days_until_event is necessary but not sufficient; confirm actual expected_delivery_at.
+[vc-00155] Before ordering an emailed purchase with a sender-specified location, assert selected_address_id's normalized street_address, city, state, country, and str(zip_code) equal the sender's parsed contact address; assert selected_product_id came from a selected variable and selected['product_type'] equals the requested category (unless adjacent categories are explicitly allowed); assert cart/order use selected_address_id and selected_product_id variables.
+[vc-00161] Before reading an emailed purchase request, assert: (1) wife/sender email was derived from phone.search_contacts relationship matches; (2) current date string was derived from phone.get_current_date_and_time and formatted as YYYY-MM-DD; (3) gmail.show_inbox_threads was filtered with those derived variables; (4) the selected email_id came from the chosen thread email_ids, not a literal; (5) parsed body variables (category, max_price, delivery location) are non-empty and used in product/address selection.
+[vc-00164] For emailed purchase orders, before place_order assert requested_quantity was parsed into a variable and used: show_product(product_id)['inventory_quantity'] >= requested_quantity, cart item quantity == requested_quantity, and order item ordered_quantity == requested_quantity. Also assert selected product's show_product product_type/semantic name/description match the emailed category and price <= max_price.
+[vc-00170] Before ordering remaining checklist items, assert: sibling_emails derived from phone contacts; checklist_email_id derived programmatically; commitment_emails are replies to checklist_email_id from sibling_emails; committed_items parsed into normalized set; remaining_items = checklist_items - committed_items; each remaining item selected by exact product_type equality and inventory_quantity >= requested_quantity; highest-rated selection uses deterministic tie-breaker.
+[vc-00191] Before sending a wishlist-derived text, assert: amazon.show_wish_list returned a non-empty list; every item has non-empty product_name, numeric price, and integer quantity >= 1; recipient phone_number is non-empty; len(message_lines) == len(wish_list); message uses newline-separated '<product_name> => $<total_price>' with half-up rounded totals; send_text_message returns a dict with a success message; supervisor.complete_task is called without answer for action tasks.
+[vc-00202] Before ordering to a relationship-specified address, assert: (1) each login password came from a matching list with len == 1; (2) relationship contacts were paginated and all normalized home_address values equal; (3) target_addr was parsed from the common contact address; (4) existing Amazon address matches were computed programmatically and add_address was called only when matches was empty; (5) selected_address_id came from re-fetched normalized match; (6) cart restoration uses sorted tuple/length assertions and zero gift-wrap/no-promo checks.
+[vc-00207] Before applying an unspecified-card expiry fallback, assert ('supervisor','show_payment_cards') in inspected_apis and call supervisor.show_payment_cards; assert amazon.show_account response lacks default_payment_card_id and record absence. Only then use phone.get_current_date_and_time to filter non-expired cards and choose latest expiry with deterministic tie-breaker.
+[vc-00208] For relationship home-address orders, parse the contact's home_address, normalize zip, compute amazon.show_addresses matches programmatically, and assert matches == [] before calling add_address or assert len(matches)==1 if already present. Never call add_address after only printing addresses; use home_address for 'home address' and exact normalized relationship labels such as father/mother/parent.
+[vc-00212] Before stopping, confirm the environment returned USER output for supervisor.complete_task; your own print(result) is not proof. If no USER output is visible, reissue only the minimal completion block and do not repeat irreversible actions.
+[vc-00216] For split-delivery same-product orders, before each place_order assert: show_product inventory_quantity >= 1; cart has exactly one item with product_id == selected_product_id, quantity == 1, and gift_wrap_quantity == desired; save cart total. After each place_order assert: order.address_id == intended_address_id, order_items[0].product_id == selected_product_id, ordered_quantity == 1, gift_wrap_quantity == desired, and paid_amount == saved total. After all orders, restore original cart with sorted tuple/length and promo assertions.
+[vc-00220] Before checking default_payment_card_id/default_address_id or iterating supervisor.show_payment_cards/show_addresses, assert isinstance(account, dict), isinstance(sup_cards, list), and each returned card/address item is a dict; only then access fields. If type validation fails, diagnose before using the response for fallback selection.
+[vc-00226] For category purchases with a small exact product_type candidate set, verify all in-stock candidates with show_product before deterministic selection; if the candidate universe is large and you use top-K verification, record the top-K rule and ensure the selected product is among verified candidates. Do not select from unverified search metadata when show_product is available.
+[vc-00227] When comparing cart total_cost to order paid_amount or other monetary floats, use cent tolerance or round both to two decimals (e.g., abs(a-b) <= 0.01 or round(a,2)==round(b,2)); do not rely on exact float equality.
+[vc-00232] For 'each of my siblings/brothers delivered to their homes', before creating Amazon addresses assert that the normalized parsed home_address values are distinct when the task implies separate homes. If duplicates exist, diagnose shared-address handling (e.g., place separate orders to the same address_id or combine quantity with per-unit gift wrap) rather than assuming distinct address IDs; after re-fetching addresses, assert one address_id per intended delivery and distinct IDs only when addresses are distinct.
+[vc-00239] Before ordering a color-specific product, assert the selected product_id is the exact product or variation whose authoritative show_product color equals the requested color. If the requested color was found only in a parent product's variations, assert show_product(selected_product_id)['color'] equals the requested color and that the selected variation product_id is the one added to the cart; do not order the parent with a different main color.
+[vc-00244] Before ordering a voice-message preference gift, assert: (1) favorite_color was parsed from a recipient reply after the supervisor's preference question in paginated voice messages; (2) recipient was resolved from paginated phone.search_contacts by exact normalized first_name and home_address parsed; (3) candidate universe unioned product_type and query and selected product's authoritative color equals favorite_color; (4) cart gift_wrap_quantity == 1 and order address_id equals recipient home address_id; (5) final completion block is closed and observed.
+[vc-00248] For color-specific category purchases, assert that the selected product_id came from a verified candidate set that either included every in-stock category candidate or used a recorded top-K rule; if the requested color was found only in variations, assert the selected variation product_id itself was verified with show_product and its authoritative color equals the requested color before add_product_to_cart.
+[vc-00253] Before ordering a phone-message recommended purchase, assert: (1) sender resolved from paginated contacts by exact normalized name and exactly one contact; (2) all messages with sender were paginated and exactly one recommendation message was selected by normalized keywords; (3) quoted product names were extracted into product_names and selection_rule was parsed; (4) each candidate product_id was derived programmatically and verified with show_product; (5) if the task names a category, selected product's authoritative name/description contains that category; (6) when multiple category-valid candidates exist, complete cart totals were compared and the cheaper/category-valid option was selected.
+## TROUBLESHOOTING AND PITFALLS:
+
+[ts-00011] If a paginated API such as amazon.search_product_types fails with AttributeError: 'NoneType' object has no attribute 'cursor', diagnose pagination behavior before abandoning it: retry with default page_limit or omit page_limit, or fall back to a more authoritative API such as search_products(product_type=...). Do not assume the failed API is unusable without trying a safer pagination pattern.
+[ts-00092] If show_cart after place_order returns cart_items=[] but total_cost/delivery_fee is nonzero, treat it as a post-order cart display artifact. Do not try to zero the total by adding/removing items or diagnose it as an unplaced order. Assert cart_items is empty, then restore the pre-order snapshot; if the snapshot was empty, clear the cart and verify cart_items remains empty.
+[ts-00115] If clean_candidates is empty, do not choose a dirty candidate or hardcode a product_id. Diagnose the evidence parser first: ensure all pages were fetched, negated statements are ignored, question-only mentions are not counted, and affirmative answers to fade questions are counted; only then broaden candidate search with task-safe related terms.
+[ts-00171] If category search returns adjacent items because query substring matches compound words (e.g., backpack matches backpacking tent), do not rely on broad bad_terms that can remove valid items; gate on exact product_type equality and verify show_product.
+[ts-00182] If Amazon product selection fails with 'Number of requests exceeded the limit' while looping show_product over candidates, diagnose the candidate universe and switch to metadata-first filtering/top-K verification. Do not reduce verification by manually choosing a printed product_id; re-derive selected product_id programmatically from ranked search candidates and verify only the final selected/top-K products.
+[ts-00186] If a note/email/file parser returns an empty list, do not manually copy expected items from truncated printed output. Print repr of the raw content, inspect line prefixes/indentation/bullet markers, fix the parser to extract all matching records, build the message/answer variable programmatically, and assert the parsed list is non-empty before sending or completing.
+[ts-00198] If a note/email/file line parser returns empty, check whether you stripped leading whitespace before testing prefixes like ' - director:'. Stripping first can turn ' - director:' into '- director:' and make startswith(' - ') fail. Preserve the original line for prefix checks or use regex, then strip only the extracted value; never hardcode expected items after a failed parser.
+## OTHERS
+[misc-00003] Remember that the email addresses, access tokens and variables (e.g. spotify_password) in the example above are not valid anymore.
+[misc-00008] Once you have completed the task, make sure to call apis.supervisor.complete_task(). If the task asked for some information, return it as the answer argument, i.e. call apis.supervisor.complete_task(answer=<answer>). Many tasks do not require an answer, so in those cases, just call apis.supervisor.complete_task() i.e. do not pass any argument.
+[misc-00009] For marketplace purchase tasks, interpret 'from its highest-rated seller' as the seller with the highest seller rating among sellers that offer the requested product category, not the highest-rated product. Collect all products in the category, extract unique seller_ids, fetch seller ratings with show_seller (or paginate search_sellers and filter to sellers that actually sell the category), choose the maximum rating, then programmatically select an in-stock product from that seller. If the task does not specify product quality, any in-stock product from the winning seller satisfies the seller constraint; use a deterministic tie-breaker such as highest product rating or lowest price.
+[misc-00114] For evidence-constrained purchases, use this order: derive size from past orders -> search in-size category candidates -> verify each with show_product -> collect all evidence -> compute clean_candidates -> deterministic select -> snapshot cart/card/address -> order -> verify using variables -> restore cart.
+[misc-00139] For tasks where instructions come from a partner/friend/coworker email, treat the email attachment/body as the authoritative checklist; optionally verify the sender relationship via phone.search_contacts when identity matters, but do not block if the email content is clear. If the task mentions an event window such as 'next week', use phone.get_current_date_and_time and product delivery_days only when arrival timing is operationally required; if no exact event date is given, record a conservative assumption and do not reject items unless the task explicitly requires delivery by a date.

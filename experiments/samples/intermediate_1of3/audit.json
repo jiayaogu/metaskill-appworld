@@ -1,0 +1,292 @@
+{
+  "source_scenario_counts": {
+    "train": 30,
+    "test_normal": 56,
+    "test_challenge": 139
+  },
+  "sample_scenario_counts": {
+    "train": 10,
+    "test_normal": 19,
+    "test_challenge": 46
+  },
+  "selected_family_ids": {
+    "train": [
+      "692c77d",
+      "2a163ab",
+      "27e1026",
+      "22cc237",
+      "76f2c72",
+      "ce359b5",
+      "e3d6c94",
+      "771d8fc",
+      "3c13f5a",
+      "e85d92a"
+    ],
+    "test_normal": [
+      "fd1f8fa",
+      "634f342",
+      "d6ac34d",
+      "cef9191",
+      "3b8fb7a",
+      "afc4005",
+      "9dabbc9",
+      "425a494",
+      "ccf4b82",
+      "2c544f9",
+      "024c982",
+      "b9c5c9a",
+      "f323bae",
+      "13547f5",
+      "b6d1104",
+      "166f4ff",
+      "83a7951",
+      "3aa1a22",
+      "986aa4e"
+    ],
+    "test_challenge": [
+      "b3bdcc1",
+      "383a053",
+      "245cb43",
+      "258796c",
+      "4815c06",
+      "ec437da",
+      "7434096",
+      "953b296",
+      "eb5ad85",
+      "f6be291",
+      "ec655df",
+      "1a79e37",
+      "f3a6713",
+      "e201314",
+      "dbc0276",
+      "e7f15ba",
+      "b6d1f70",
+      "dc5c5c6",
+      "59bcfc8",
+      "7e1be84",
+      "5800354",
+      "66b7899",
+      "f099b4c",
+      "365e0a3",
+      "476b213",
+      "998908e",
+      "dcbd34b",
+      "7bdaf23",
+      "a97e35d",
+      "a3ba388",
+      "bcb9696",
+      "e70b117",
+      "3fcc458",
+      "a1d3dfd",
+      "6a5e690",
+      "e52623a",
+      "5e27cd7",
+      "277d81d",
+      "d37c235",
+      "4d12842",
+      "2ff4dfb",
+      "adb1060",
+      "18670a5",
+      "b71318e",
+      "a676f2a",
+      "fb05fed"
+    ]
+  },
+  "seed": 20261015,
+  "proposals": 600000,
+  "ranking": [
+    0.037437343358,
+    0.099630400289,
+    0.166666666667,
+    0.331546335341
+  ],
+  "settings": {
+    "difficulty_categories": [
+      1,
+      2,
+      3
+    ],
+    "app_count_categories": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "novelty_similarity_cutoffs": {
+      "test_normal": [
+        0.07755693197261752,
+        0.20493827954234947
+      ],
+      "test_challenge": [
+        0.025227600832362227,
+        0.07944514395534269
+      ]
+    },
+    "tfidf": {
+      "stop_words": "english",
+      "ngram_range": [
+        1,
+        2
+      ],
+      "sublinear_tf": true
+    }
+  },
+  "full_topic_probability": {
+    "train": {
+      "Amazon": 0.0,
+      "Gmail": 0.0,
+      "Todoist": 0.0,
+      "Splitwise": 0.0,
+      "Spotify": 0.5,
+      "Venmo": 0.2,
+      "Simple Note": 0.08333333333333333,
+      "Phone": 0.08333333333333333,
+      "File system": 0.13333333333333333,
+      "Other": 0.0
+    },
+    "test_normal": {
+      "Amazon": 0.0,
+      "Gmail": 0.0,
+      "Todoist": 0.03571428571428571,
+      "Splitwise": 0.03571428571428571,
+      "Spotify": 0.21428571428571427,
+      "Venmo": 0.34523809523809523,
+      "Simple Note": 0.1875,
+      "Phone": 0.09226190476190477,
+      "File system": 0.07142857142857142,
+      "Other": 0.017857142857142856
+    },
+    "test_challenge": {
+      "Amazon": 0.4364508393285372,
+      "Gmail": 0.11870503597122302,
+      "Todoist": 0.007194244604316547,
+      "Splitwise": 0.01079136690647482,
+      "Spotify": 0.06354916067146282,
+      "Venmo": 0.07194244604316546,
+      "Simple Note": 0.03237410071942446,
+      "Phone": 0.0683453237410072,
+      "File system": 0.10431654676258993,
+      "Other": 0.08633093525179857
+    }
+  },
+  "sample_topic_probability": {
+    "train": {
+      "Amazon": 0.0,
+      "Gmail": 0.0,
+      "Todoist": 0.0,
+      "Splitwise": 0.0,
+      "Spotify": 0.5,
+      "Venmo": 0.2,
+      "Simple Note": 0.05,
+      "Phone": 0.1,
+      "File system": 0.15,
+      "Other": 0.0
+    },
+    "test_normal": {
+      "Amazon": 0.0,
+      "Gmail": 0.0,
+      "Todoist": 0.02631578947368421,
+      "Splitwise": 0.05263157894736842,
+      "Spotify": 0.21052631578947367,
+      "Venmo": 0.34210526315789475,
+      "Simple Note": 0.18421052631578946,
+      "Phone": 0.10526315789473684,
+      "File system": 0.07894736842105263,
+      "Other": 0.0
+    },
+    "test_challenge": {
+      "Amazon": 0.44202898550724645,
+      "Gmail": 0.11956521739130435,
+      "Todoist": 0.0,
+      "Splitwise": 0.010869565217391304,
+      "Spotify": 0.05797101449275362,
+      "Venmo": 0.07608695652173914,
+      "Simple Note": 0.03260869565217391,
+      "Phone": 0.06521739130434782,
+      "File system": 0.10869565217391304,
+      "Other": 0.08695652173913043
+    }
+  },
+  "within_split_tv": {
+    "train": {
+      "topic": 0.03333333333333333,
+      "difficulty": 0.0,
+      "app_count": 0.16666666666666669
+    },
+    "test_normal": {
+      "topic": 0.03743734335839598,
+      "difficulty": 0.029135338345864653,
+      "app_count": 0.06860902255639101,
+      "novelty_bin": 0.02631578947368421
+    },
+    "test_challenge": {
+      "topic": 0.01590032321968516,
+      "difficulty": 0.011104160150140749,
+      "app_count": 0.017047231779793587,
+      "novelty_bin": 0.012668126368470423
+    }
+  },
+  "source_train_to_test_topic_tv": {
+    "test_normal": 0.3476190476190476,
+    "test_challenge": 0.65947242206235
+  },
+  "sample_train_to_test_topic_tv": {
+    "test_normal": 0.3605263157894737,
+    "test_challenge": 0.6594202898550726
+  },
+  "absolute_train_to_test_tv_error": {
+    "test_normal": 0.01290726817042609,
+    "test_challenge": 5.213220727739998e-05
+  },
+  "test_only_app_prevalence": {
+    "train": {
+      "full_unseen_app_families": 0,
+      "sample_unseen_app_families": 0,
+      "full_by_app": {
+        "Amazon": 0,
+        "Gmail": 0,
+        "Splitwise": 0,
+        "Todoist": 0
+      },
+      "sample_by_app": {
+        "Amazon": 0,
+        "Gmail": 0,
+        "Splitwise": 0,
+        "Todoist": 0
+      }
+    },
+    "test_normal": {
+      "full_unseen_app_families": 7,
+      "sample_unseen_app_families": 3,
+      "full_by_app": {
+        "Amazon": 0,
+        "Gmail": 0,
+        "Splitwise": 4,
+        "Todoist": 3
+      },
+      "sample_by_app": {
+        "Amazon": 0,
+        "Gmail": 0,
+        "Splitwise": 2,
+        "Todoist": 1
+      }
+    },
+    "test_challenge": {
+      "full_unseen_app_families": 94,
+      "sample_unseen_app_families": 30,
+      "full_by_app": {
+        "Amazon": 74,
+        "Gmail": 19,
+        "Splitwise": 2,
+        "Todoist": 1
+      },
+      "sample_by_app": {
+        "Amazon": 24,
+        "Gmail": 7,
+        "Splitwise": 1,
+        "Todoist": 0
+      }
+    }
+  }
+}

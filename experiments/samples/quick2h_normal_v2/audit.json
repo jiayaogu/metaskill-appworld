@@ -1,0 +1,193 @@
+{
+  "design": "outcome-blind quick2h normal v2; original train and challenge unchanged",
+  "source_split": "test_normal",
+  "full_normal_families": 56,
+  "old_families": [
+    "3b8fb7a",
+    "f323bae",
+    "59fae45",
+    "dac78d9",
+    "3aa1a22"
+  ],
+  "selected_families_in_full_split_order": [
+    "ff58e36",
+    "f323bae",
+    "59fae45",
+    "0a9d82a",
+    "dac78d9",
+    "3aa1a22",
+    "986aa4e"
+  ],
+  "retained": [
+    "f323bae",
+    "59fae45",
+    "dac78d9",
+    "3aa1a22"
+  ],
+  "removed": [
+    "3b8fb7a"
+  ],
+  "added": [
+    "ff58e36",
+    "0a9d82a",
+    "986aa4e"
+  ],
+  "family_difficulty": {
+    "ff58e36": 2,
+    "f323bae": 3,
+    "59fae45": 1,
+    "0a9d82a": 3,
+    "dac78d9": 1,
+    "3aa1a22": 2,
+    "986aa4e": 3
+  },
+  "counts": {
+    "train": 15,
+    "test_normal_v2": 21,
+    "test_challenge": 15,
+    "total": 51
+  },
+  "estimated_minutes_at_2_2_per_task": 112.2,
+  "selection": {
+    "candidate_rule": "retain >=4/5 old families; 7 total; D1/D2/D3=2/2/3; include Splitwise and Todoist",
+    "feasible_candidates": 3105,
+    "rank": [
+      "max primary TV",
+      "sum primary TV",
+      "max secondary TV",
+      "sum secondary TV",
+      "source-order family IDs"
+    ],
+    "primary": [
+      "topic",
+      "difficulty",
+      "app_count",
+      "shift_error"
+    ],
+    "secondary": [
+      "novelty_bin",
+      "num_apis",
+      "num_api_calls",
+      "num_solution_code_lines"
+    ],
+    "outcome_files_read": false
+  },
+  "representation": {
+    "difficulty_categories": [
+      1,
+      2,
+      3
+    ],
+    "app_count_categories": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "novelty_similarity_cutoffs": {
+      "test_normal": [
+        0.07755693197261752,
+        0.20493827954234947
+      ],
+      "test_challenge": [
+        0.025227600832362227,
+        0.07944514395534269
+      ]
+    },
+    "tfidf": {
+      "stop_words": "english",
+      "ngram_range": [
+        1,
+        2
+      ],
+      "sublinear_tf": true
+    },
+    "complexity_quartile_cutoffs": {
+      "num_apis": [
+        6.0,
+        10.0
+      ],
+      "num_api_calls": [
+        16.75,
+        40.0
+      ],
+      "num_solution_code_lines": [
+        28.0,
+        55.5
+      ]
+    }
+  },
+  "topics": [
+    "Amazon",
+    "Gmail",
+    "Todoist",
+    "Splitwise",
+    "Spotify",
+    "Venmo",
+    "Simple Note",
+    "Phone",
+    "File system",
+    "Other"
+  ],
+  "full_normal_topic_probability": [
+    0.0,
+    0.0,
+    0.03571428571428571,
+    0.03571428571428571,
+    0.21428571428571427,
+    0.34523809523809523,
+    0.1875,
+    0.09226190476190477,
+    0.07142857142857142,
+    0.017857142857142856
+  ],
+  "sample_normal_topic_probability": [
+    0.0,
+    0.0,
+    0.07142857142857142,
+    0.07142857142857142,
+    0.21428571428571427,
+    0.2857142857142857,
+    0.21428571428571427,
+    0.07142857142857142,
+    0.07142857142857142,
+    0.0
+  ],
+  "full_normal_difficulty_probability": [
+    0.3392857142857143,
+    0.2857142857142857,
+    0.375
+  ],
+  "sample_normal_difficulty_probability": [
+    0.2857142857142857,
+    0.2857142857142857,
+    0.42857142857142855
+  ],
+  "full_normal_app_count_probability": [
+    0.4642857142857143,
+    0.44642857142857145,
+    0.08928571428571429,
+    0.0,
+    0.0
+  ],
+  "sample_normal_app_count_probability": [
+    0.42857142857142855,
+    0.42857142857142855,
+    0.14285714285714285,
+    0.0,
+    0.0
+  ],
+  "within_normal_tv": {
+    "topic": 0.09821428571428571,
+    "difficulty": 0.053571428571428575,
+    "app_count": 0.05357142857142861,
+    "novelty_bin": 0.10714285714285712,
+    "num_apis": 0.14285714285714285,
+    "num_api_calls": 0.11904761904761907,
+    "num_solution_code_lines": 0.10714285714285714
+  },
+  "full_train_to_normal_topic_tv": 0.3476190476190476,
+  "quick2h_train_to_v2_normal_topic_tv": 0.41428571428571426,
+  "train_to_normal_shift_error": 0.06666666666666665
+}

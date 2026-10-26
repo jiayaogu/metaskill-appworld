@@ -1,0 +1,41 @@
+# Input: data/datasets/18_task_online_no_gt_pilot.txt (18 tasks, six complete families).
+# Rubric: ../memory_pressure_screening.md
+# Intrinsic evidence only: specs.json, evaluation.py, and cross-variant structure.
+# Candidate iff every M/I/A/P/U score is at least 1.
+train:
+  07b42fd:
+    M: {score: 2, evidence: "Genres change from classical to EDM to reggae, and minimum follower counts are 22/23/21.", justification: "The artist-following procedure transfers, but reusing a prior genre or threshold would follow the wrong artists."}
+    I: {score: 2, evidence: "The evaluator separately checks followed artists' genre and minimum follower count.", justification: "Genre and follower-threshold rules must be retrieved jointly, while prior variants' values are plausible distractors."}
+    A: {score: 2, evidence: "Filter artists by genre and follower count before following them.", justification: "The correct follow set requires the intersection of two task-specific predicates and a write action."}
+    P: {score: 1, evidence: "Evaluator requirements distinguish wrong genre, insufficient followers, and unintended removals.", justification: "Per-condition feedback can identify which selection or action rule failed."}
+    U: {score: 2, evidence: "Finding and following qualifying artists is stable, while genre and follower threshold change.", justification: "The workflow should transfer, but the old genre and threshold should not."}
+  e3d6c94:
+    M: {score: 2, evidence: "Variants change classical/R&B, this year/this or last year, and the playlist title.", justification: "The recommended-song workflow transfers, but reusing an old genre, year range, or title would select the wrong songs."}
+    I: {score: 2, evidence: "The evaluator separately checks recommended songs' genre, release year, and playlist membership.", justification: "Recommendation source, genre, and time rules must be retrieved together, while another variant's values are distractors."}
+    A: {score: 2, evidence: "Filter by genre and release year, create the specified playlist, and add every matching song.", justification: "Execution combines multiple predicates, set collection, and a playlist write."}
+    P: {score: 1, evidence: "The evaluator separately checks playlist title, genre, recency, and the complete song-ID set.", justification: "These conditions can localize a failure to naming, filtering, or omitted songs."}
+    U: {score: 2, evidence: "Recommendation lookup and playlist creation remain stable while genre and time window change.", justification: "The procedure should transfer, but the earlier genre and year range should not."}
+  76f2c72:
+    M: {score: 2, evidence: "The requested bill category changes among electricity, internet, and cable.", justification: "Reading bills and summing costs transfers, but reusing the prior category gives the wrong total."}
+    I: {score: 2, evidence: "Each variant asks for this year's total for one category within the same bills directory.", justification: "Bill lookup, category and year filtering, and aggregation rules must be combined, while other categories are distractors."}
+    A: {score: 2, evidence: "Find bill files, filter by category and year, extract amounts, and sum them.", justification: "Correct execution composes filtering, value extraction, and aggregation."}
+    P: {score: 0, evidence: "The evaluator only checks the numeric answer and that no models changed.", justification: "A wrong total does not identify whether category selection, date filtering, amount extraction, or summation failed."}
+    U: {score: 2, evidence: "Bill parsing and summation stay useful, while electricity/internet/cable changes.", justification: "The computation can transfer, but the category-specific filter should not."}
+  2a163ab:
+    M: {score: 2, evidence: "Variants change today/yesterday/today-or-yesterday and roommates/siblings/coworkers.", justification: "Liking qualifying feed transactions transfers, but old date or relationship filters would target the wrong transactions."}
+    I: {score: 2, evidence: "The evaluator checks exact liked IDs and separately tests recent-transaction and relationship membership.", justification: "Date and relationship rules must be retrieved jointly, while other variants' groups and windows are distractors."}
+    A: {score: 2, evidence: "Intersect social-feed transactions by date and relationship, then like every match.", justification: "Two non-trivial filters and the resulting set of write actions must be composed."}
+    P: {score: 1, evidence: "Evaluator requirements separate exact liked IDs, recency, relationship, and unintended new transactions.", justification: "Failure feedback can distinguish date, relationship, completeness, and side-effect errors."}
+    U: {score: 2, evidence: "The social-feed filtering and like action remain stable, while relation and date window change.", justification: "The procedure should transfer, but the prior group and time window should not."}
+  3c13f5a:
+    M: {score: 2, evidence: "The receipt category and request note change across electricity, internet, and cable variants.", justification: "Splitting a bill among roommates transfers, but copying an old receipt category or note causes incorrect requests."}
+    I: {score: 2, evidence: "The evaluator separately checks roommate receivers, per-person amounts, and description notes.", justification: "Receipt lookup, equal-split arithmetic, recipient resolution, and note rules must be retrieved together, while other bill types are distractors."}
+    A: {score: 2, evidence: "Read the relevant file-system receipt, divide the bill among roommates and self, then create Venmo requests.", justification: "Receipt extraction, arithmetic, entity mapping, and request creation form a dependent workflow."}
+    P: {score: 1, evidence: "Evaluator requirements separately test receiver IDs, amounts, notes, and absence of request updates or removals.", justification: "Per-condition feedback can localize a recipient, arithmetic, wording, or side-effect error."}
+    U: {score: 2, evidence: "Equal bill sharing and Venmo requests stay stable, while bill type, amount, and note vary.", justification: "The splitting workflow should transfer, but the bill data and request text should not."}
+  d0b1f43:
+    M: {score: 2, evidence: "Variants change roommates/coworkers, start date, and sent/received direction.", justification: "Summing relevant Venmo transfers transfers, but old relation, date, or direction filters change the answer."}
+    I: {score: 2, evidence: "The three questions require direction, relationship, and start-date constraints on Venmo history.", justification: "Those filters and the sum rule must be retrieved jointly, while another variant's direction or group is a distractor."}
+    A: {score: 2, evidence: "Filter Venmo history by relation, date, and sent/received direction before summing amounts.", justification: "Multiple predicates and amount aggregation must be composed."}
+    P: {score: 0, evidence: "The evaluator only checks the numeric answer and that no models changed.", justification: "An incorrect total does not diagnose whether the relation, date, direction, or aggregation was wrong."}
+    U: {score: 2, evidence: "Venmo-history filtering and summation transfer, while relationship, date, and direction change.", justification: "The aggregation procedure should transfer, but earlier filter bindings should not."}

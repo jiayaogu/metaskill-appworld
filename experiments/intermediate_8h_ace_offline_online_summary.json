@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "completed_date": "2026-10-21",
+  "timezone": "America/Toronto",
+  "actual_model": "qwen3.8-flash",
+  "requested_solver_label": "Qwen",
+  "parameters": {
+    "temperature": 0,
+    "model_seed": 100,
+    "appworld_seed": 123,
+    "max_steps": 40,
+    "use_cache": false,
+    "use_gt_code": false
+  },
+  "pricing_usd_per_million_tokens": {
+    "uncached_input": 0.64,
+    "cached_input": 0.08,
+    "output": 2.16
+  },
+  "datasets": {
+    "train": {"name": "intermediate_8h_train", "tasks": 30, "families": 10, "sha256": "f35369eef5c7d5925d56be16b38d4b6ab4be19e9bd4a88cdb61c0033d7430bb9"},
+    "normal": {"name": "intermediate_8h_test_normal", "tasks": 57, "families": 19, "sha256": "2d2355a0bb55e00ff72a60731b7e8ffdbc2536cdf43526721f5c993b157dbaf8"},
+    "challenge": {"name": "intermediate_8h_test_challenge", "tasks": 138, "families": 46, "sha256": "c27f9d6df4e5967f57a67ab981c98a97193adfd1e00306f89dc7529c035e9795"}
+  },
+  "results": {
+    "offline_adaptation": {"tasks": 30, "families": 10, "successful_tasks": 27, "successful_families": 7, "tgc": 90.0, "sgc": 70.0, "cost_usd": 4.09760184},
+    "offline_normal": {"tasks": 57, "families": 19, "successful_tasks": 52, "successful_families": 16, "tgc": 91.2, "sgc": 84.2, "test_cost_usd": 4.10846888, "standalone_cost_usd": 8.20607072},
+    "online_normal": {"tasks": 57, "families": 19, "successful_tasks": 51, "successful_families": 16, "tgc": 89.5, "sgc": 84.2, "cost_usd": 9.88644232},
+    "offline_challenge": {"tasks": 138, "families": 46, "successful_tasks": 117, "successful_families": 33, "tgc": 84.8, "sgc": 71.7, "test_cost_usd": 15.18353976, "standalone_cost_usd": 19.28114160},
+    "online_challenge": {"tasks": 138, "families": 46, "successful_tasks": 130, "successful_families": 39, "tgc": 94.2, "sgc": 84.8, "cost_usd": 47.73720088}
+  },
+  "usage": {
+    "offline_adaptation": {"calls": 609, "uncached_input_tokens": 2808130, "cached_input_tokens": 9180928, "output_tokens": 724965},
+    "offline_normal": {"calls": 1099, "uncached_input_tokens": 1563428, "cached_input_tokens": 27433728, "output_tokens": 422767},
+    "offline_challenge": {"calls": 3670, "uncached_input_tokens": 5601769, "cached_input_tokens": 106739968, "output_tokens": 1416301},
+    "online_normal": {"calls": 1222, "uncached_input_tokens": 7063570, "cached_input_tokens": 25595136, "output_tokens": 1536179},
+    "online_challenge": {"calls": 2782, "uncached_input_tokens": 43589890, "cached_input_tokens": 127243008, "output_tokens": 4472329}
+  },
+  "project_cost_usd": 81.01325368,
+  "paired_migration": {
+    "normal": {"task_counts": {"SS": 49, "FS": 2, "SF": 3, "FF": 3}, "family_counts": {"SS": 15, "FS": 1, "SF": 1, "FF": 2}, "official_delta_pp": {"tgc": -1.7, "sgc": 0.0}, "positive_tasks": ["d6ac34d_1", "d6ac34d_2"], "negative_tasks": ["425a494_2", "425a494_3", "2c544f9_3"]},
+    "challenge": {"task_counts": {"SS": 113, "FS": 17, "SF": 4, "FF": 4}, "family_counts": {"SS": 31, "FS": 8, "SF": 2, "FF": 5}, "official_delta_pp": {"tgc": 9.4, "sgc": 13.1}, "positive_tasks": ["245cb43_2", "f6be291_3", "ec655df_1", "ec655df_2", "1a79e37_3", "f3a6713_1", "f3a6713_2", "b6d1f70_2", "b6d1f70_3", "dc5c5c6_1", "dc5c5c6_3", "59bcfc8_1", "59bcfc8_3", "5800354_2", "476b213_3", "a97e35d_1", "a1d3dfd_1"], "negative_tasks": ["245cb43_3", "e201314_2", "476b213_2", "d37c235_3"]}
+  },
+  "playbooks": {
+    "initial": {"bytes": 1469, "sha256": "3c4f46888c9159088c3eb8f70e879d4d28a5704ab9f15d132563ba0ee2730b7b"},
+    "offline_final": {"bytes": 59887, "bullets": 130, "sha256": "8b367c5b239498683bdd598217bef652cc0fb3ea46c7a80ea9a5ceea37e908e6", "frozen_hash_verified": true},
+    "online_normal_final": {"bytes": 112074, "bullets": 221, "sha256": "7f75f2f2fe205870c1e6dd7c9411d1dff053ec7f5f13ea9b1a8ee6fc06cf3230"},
+    "online_challenge_final": {"bytes": 416546, "bullets": 540, "sha256": "575d8e7d5ffde34ef9d454365d24a797baa6a48e3e4be31d0f24598d6ed1b3c8"}
+  },
+  "artifact_audit": {"passed": true, "formal_task_occurrences": 420, "reports": 420, "missing_tasks": 0, "extra_tasks": 0, "layout_issues": 0, "jsonl_parse_errors": 0, "db_files_per_task": 13, "archived_interrupted_partials_excluded": 2, "archive_manifest": "experiments/outputs/archived_incomplete_test_runs_20261026.intermediate8h/ARCHIVE_MANIFEST.json"},
+  "versions": {"appworld_code": "0.1.4.dev0", "appworld_data": "0.1.0", "nested_git_revision": "cc865ddf0aa2eb2dc35459190d5d3b660d2dfb56", "root_git_revision": "82709de050e1db6e6ef2f07bcb0393560b94992a"}
+}

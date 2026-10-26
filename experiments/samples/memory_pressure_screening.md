@@ -231,4 +231,5 @@ Keep these two TV questions separate in both the audit and any plots or tables.
 The first checks resemblance to each split; the second checks whether the
 train/test content shift has been retained. The [LaTeX summary
 table](../quick2h_topic_distribution.tex) shows both for the existing two
-samples.
+samples. A larger unconditioned example is the
+[one-third intermediate sample](../intermediate_1of3_sampling.md).

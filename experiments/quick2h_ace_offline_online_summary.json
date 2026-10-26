@@ -1,0 +1,714 @@
+{
+  "actual_model": "qwen3.8-flash",
+  "dataset_sha256": {
+    "quick2h_test_challenge": "61b816fb6c9cf162383643782e0a9309e83253b2ed2be59346babbff3e402919",
+    "quick2h_test_normal": "ddffd3a8615732431098d6f173762c667428de4d8ba90922ec17feefbd08adce",
+    "quick2h_train": "b67d763e2feb7e0d948bbf506d77b8d952c901f6e029b2ec207db89c57989c5a"
+  },
+  "generated_at": "2026-10-21T10:32:15.233210-04:00",
+  "git": {
+    "ace_appworld": {
+      "branch": "main",
+      "dirty": true,
+      "head": "cc865ddf0aa2eb2dc35459190d5d3b660d2dfb56"
+    },
+    "root": {
+      "branch": "main",
+      "dirty": true,
+      "head": "82709de050e1db6e6ef2f07bcb0393560b94992a"
+    }
+  },
+  "migration": {
+    "challenge": {
+      "both_fail": [
+        "c8f5f44_2"
+      ],
+      "both_success": [
+        "476b213_1",
+        "476b213_3",
+        "5238afc_1",
+        "7bdaf23_1",
+        "7bdaf23_2",
+        "7bdaf23_3",
+        "adb1060_1",
+        "adb1060_2",
+        "adb1060_3"
+      ],
+      "counts": {
+        "both_fail": 1,
+        "both_success": 9,
+        "offline_fail_online_success": 0,
+        "offline_success_online_fail": 5
+      },
+      "offline_fail_online_success": [],
+      "offline_success_online_fail": [
+        "476b213_2",
+        "5238afc_2",
+        "5238afc_3",
+        "c8f5f44_1",
+        "c8f5f44_3"
+      ],
+      "sgc_delta_points": -40.0,
+      "tgc_delta_points": -33.3
+    },
+    "normal": {
+      "both_fail": [],
+      "both_success": [
+        "3aa1a22_1",
+        "3aa1a22_2",
+        "3aa1a22_3",
+        "3b8fb7a_1",
+        "3b8fb7a_2",
+        "3b8fb7a_3",
+        "59fae45_1",
+        "59fae45_2",
+        "59fae45_3",
+        "dac78d9_1",
+        "dac78d9_2",
+        "dac78d9_3",
+        "f323bae_1",
+        "f323bae_2",
+        "f323bae_3"
+      ],
+      "counts": {
+        "both_fail": 0,
+        "both_success": 15,
+        "offline_fail_online_success": 0,
+        "offline_success_online_fail": 0
+      },
+      "offline_fail_online_success": [],
+      "offline_success_online_fail": [],
+      "sgc_delta_points": 0.0,
+      "tgc_delta_points": 0.0
+    }
+  },
+  "playbooks": {
+    "initial": {
+      "bullet_count": 8,
+      "bytes": 1469,
+      "characters": 1469,
+      "nonempty_lines": 16,
+      "path": "experiments/playbooks/appworld_initial_playbook.txt",
+      "sha256": "3c4f46888c9159088c3eb8f70e879d4d28a5704ab9f15d132563ba0ee2730b7b"
+    },
+    "offline": {
+      "bullet_count": 72,
+      "bytes": 26499,
+      "characters": 26497,
+      "nonempty_lines": 80,
+      "path": "experiments/playbooks/quick2h_offline_online/qwen3.8-flash/offline_no_GT.txt",
+      "sha256": "ff47dbf949d06a08d47c378f1f5f891d5e700702e00af816222653123bf06028"
+    },
+    "online_challenge": {
+      "bullet_count": 82,
+      "bytes": 29560,
+      "characters": 29556,
+      "nonempty_lines": 115,
+      "path": "experiments/playbooks/quick2h_offline_online/qwen3.8-flash/online_no_GT_test_challenge.txt",
+      "sha256": "d11ed56fdd247d566549803d5c3357530e9c76f516e404a8861d2854cf63773c"
+    },
+    "online_normal": {
+      "bullet_count": 84,
+      "bytes": 55115,
+      "characters": 55115,
+      "nonempty_lines": 621,
+      "path": "experiments/playbooks/quick2h_offline_online/qwen3.8-flash/online_no_GT_test_normal.txt",
+      "sha256": "1061a52e32aabd5e55a2e2d52fce6dce44b4ae040c1dc9ad6fced0f410350410"
+    }
+  },
+  "rates": {
+    "cache_read_usd_per_1m_tokens": 0.08,
+    "input_usd_per_1m_tokens": 0.64,
+    "output_usd_per_1m_tokens": 2.16
+  },
+  "runs": {
+    "offline_adaptation": {
+      "actual_task_ids": [
+        "07b42fd_1",
+        "07b42fd_2",
+        "07b42fd_3",
+        "6ea6792_1",
+        "6ea6792_2",
+        "6ea6792_3",
+        "7d7fbf6_1",
+        "7d7fbf6_2",
+        "7d7fbf6_3",
+        "b0a8eae_1",
+        "b0a8eae_2",
+        "b0a8eae_3",
+        "ce359b5_1",
+        "ce359b5_2",
+        "ce359b5_3"
+      ],
+      "artifact_audit": {
+        "issue_count": 0,
+        "issues_by_task": {},
+        "valid": true
+      },
+      "dataset": "quick2h_train",
+      "evaluation_path": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/offline_no_GT_adaptation/evaluations/quick2h_train.json",
+      "expected_task_ids": [
+        "ce359b5_1",
+        "ce359b5_2",
+        "ce359b5_3",
+        "b0a8eae_1",
+        "b0a8eae_2",
+        "b0a8eae_3",
+        "7d7fbf6_1",
+        "7d7fbf6_2",
+        "7d7fbf6_3",
+        "07b42fd_1",
+        "07b42fd_2",
+        "07b42fd_3",
+        "6ea6792_1",
+        "6ea6792_2",
+        "6ea6792_3"
+      ],
+      "experiment": "offline_no_GT_adaptation",
+      "extra_task_ids": [],
+      "key": "offline_adaptation",
+      "main_result": false,
+      "metrics": {
+        "by_difficulty": {
+          "1": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          },
+          "2": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          },
+          "3": {
+            "complete_families": 1,
+            "sgc": 0.0,
+            "success_families": 0,
+            "success_tasks": 0,
+            "tasks": 3,
+            "tgc": 0.0
+          }
+        },
+        "failed_tasks": [
+          "b0a8eae_1",
+          "b0a8eae_2",
+          "b0a8eae_3"
+        ],
+        "families": 5,
+        "sgc": 80.0,
+        "success_families": 4,
+        "success_map": {
+          "07b42fd_1": true,
+          "07b42fd_2": true,
+          "07b42fd_3": true,
+          "6ea6792_1": true,
+          "6ea6792_2": true,
+          "6ea6792_3": true,
+          "7d7fbf6_1": true,
+          "7d7fbf6_2": true,
+          "7d7fbf6_3": true,
+          "b0a8eae_1": false,
+          "b0a8eae_2": false,
+          "b0a8eae_3": false,
+          "ce359b5_1": true,
+          "ce359b5_2": true,
+          "ce359b5_3": true
+        },
+        "success_tasks": 12,
+        "tasks": 15,
+        "tgc": 80.0
+      },
+      "missing_task_ids": [],
+      "mode": "offline adaptation",
+      "no_complete_task_ids": [],
+      "output_root": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/offline_no_GT_adaptation",
+      "playbook": "offline_no_GT.txt",
+      "split": "train",
+      "usage": {
+        "api_calls": 1664,
+        "cached_prompt_tokens": 4361984,
+        "completion_tokens": 399234,
+        "fixed_registry_cost_usd": 2.00344368,
+        "llm_calls": 324,
+        "prompt_tokens": 5599702,
+        "total_tokens": 5998936,
+        "uncached_prompt_tokens": 1237718
+      }
+    },
+    "offline_challenge": {
+      "actual_task_ids": [
+        "476b213_1",
+        "476b213_2",
+        "476b213_3",
+        "5238afc_1",
+        "5238afc_2",
+        "5238afc_3",
+        "7bdaf23_1",
+        "7bdaf23_2",
+        "7bdaf23_3",
+        "adb1060_1",
+        "adb1060_2",
+        "adb1060_3",
+        "c8f5f44_1",
+        "c8f5f44_2",
+        "c8f5f44_3"
+      ],
+      "artifact_audit": {
+        "issue_count": 0,
+        "issues_by_task": {},
+        "valid": true
+      },
+      "dataset": "quick2h_test_challenge",
+      "evaluation_path": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/offline_no_GT_evaluation_test_challenge/evaluations/quick2h_test_challenge.json",
+      "expected_task_ids": [
+        "5238afc_1",
+        "5238afc_2",
+        "5238afc_3",
+        "c8f5f44_1",
+        "c8f5f44_2",
+        "c8f5f44_3",
+        "476b213_1",
+        "476b213_2",
+        "476b213_3",
+        "7bdaf23_1",
+        "7bdaf23_2",
+        "7bdaf23_3",
+        "adb1060_1",
+        "adb1060_2",
+        "adb1060_3"
+      ],
+      "experiment": "offline_no_GT_evaluation_test_challenge",
+      "extra_task_ids": [],
+      "key": "offline_challenge",
+      "main_result": true,
+      "metrics": {
+        "by_difficulty": {
+          "1": {
+            "complete_families": 1,
+            "sgc": 100.0,
+            "success_families": 1,
+            "success_tasks": 3,
+            "tasks": 3,
+            "tgc": 100.0
+          },
+          "2": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          },
+          "3": {
+            "complete_families": 2,
+            "sgc": 50.0,
+            "success_families": 1,
+            "success_tasks": 5,
+            "tasks": 6,
+            "tgc": 83.3
+          }
+        },
+        "failed_tasks": [
+          "c8f5f44_2"
+        ],
+        "families": 5,
+        "sgc": 80.0,
+        "success_families": 4,
+        "success_map": {
+          "476b213_1": true,
+          "476b213_2": true,
+          "476b213_3": true,
+          "5238afc_1": true,
+          "5238afc_2": true,
+          "5238afc_3": true,
+          "7bdaf23_1": true,
+          "7bdaf23_2": true,
+          "7bdaf23_3": true,
+          "adb1060_1": true,
+          "adb1060_2": true,
+          "adb1060_3": true,
+          "c8f5f44_1": true,
+          "c8f5f44_2": false,
+          "c8f5f44_3": true
+        },
+        "success_tasks": 14,
+        "tasks": 15,
+        "tgc": 93.3
+      },
+      "missing_task_ids": [],
+      "mode": "offline frozen",
+      "no_complete_task_ids": [],
+      "output_root": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/offline_no_GT_evaluation_test_challenge",
+      "playbook": "offline_no_GT.txt",
+      "split": "challenge",
+      "usage": {
+        "api_calls": 455,
+        "cached_prompt_tokens": 6365440,
+        "completion_tokens": 108305,
+        "fixed_registry_cost_usd": 1.04329752,
+        "llm_calls": 321,
+        "prompt_tokens": 6834383,
+        "total_tokens": 6942688,
+        "uncached_prompt_tokens": 468943
+      }
+    },
+    "offline_normal": {
+      "actual_task_ids": [
+        "3aa1a22_1",
+        "3aa1a22_2",
+        "3aa1a22_3",
+        "3b8fb7a_1",
+        "3b8fb7a_2",
+        "3b8fb7a_3",
+        "59fae45_1",
+        "59fae45_2",
+        "59fae45_3",
+        "dac78d9_1",
+        "dac78d9_2",
+        "dac78d9_3",
+        "f323bae_1",
+        "f323bae_2",
+        "f323bae_3"
+      ],
+      "artifact_audit": {
+        "issue_count": 0,
+        "issues_by_task": {},
+        "valid": true
+      },
+      "dataset": "quick2h_test_normal",
+      "evaluation_path": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/offline_no_GT_evaluation_test_normal/evaluations/quick2h_test_normal.json",
+      "expected_task_ids": [
+        "3b8fb7a_1",
+        "3b8fb7a_2",
+        "3b8fb7a_3",
+        "f323bae_1",
+        "f323bae_2",
+        "f323bae_3",
+        "59fae45_1",
+        "59fae45_2",
+        "59fae45_3",
+        "dac78d9_1",
+        "dac78d9_2",
+        "dac78d9_3",
+        "3aa1a22_1",
+        "3aa1a22_2",
+        "3aa1a22_3"
+      ],
+      "experiment": "offline_no_GT_evaluation_test_normal",
+      "extra_task_ids": [],
+      "key": "offline_normal",
+      "main_result": true,
+      "metrics": {
+        "by_difficulty": {
+          "1": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          },
+          "2": {
+            "complete_families": 1,
+            "sgc": 100.0,
+            "success_families": 1,
+            "success_tasks": 3,
+            "tasks": 3,
+            "tgc": 100.0
+          },
+          "3": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          }
+        },
+        "failed_tasks": [],
+        "families": 5,
+        "sgc": 100.0,
+        "success_families": 5,
+        "success_map": {
+          "3aa1a22_1": true,
+          "3aa1a22_2": true,
+          "3aa1a22_3": true,
+          "3b8fb7a_1": true,
+          "3b8fb7a_2": true,
+          "3b8fb7a_3": true,
+          "59fae45_1": true,
+          "59fae45_2": true,
+          "59fae45_3": true,
+          "dac78d9_1": true,
+          "dac78d9_2": true,
+          "dac78d9_3": true,
+          "f323bae_1": true,
+          "f323bae_2": true,
+          "f323bae_3": true
+        },
+        "success_tasks": 15,
+        "tasks": 15,
+        "tgc": 100.0
+      },
+      "missing_task_ids": [],
+      "mode": "offline frozen",
+      "no_complete_task_ids": [],
+      "output_root": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/offline_no_GT_evaluation_test_normal",
+      "playbook": "offline_no_GT.txt",
+      "split": "normal",
+      "usage": {
+        "api_calls": 627,
+        "cached_prompt_tokens": 5316864,
+        "completion_tokens": 101085,
+        "fixed_registry_cost_usd": 0.91775736,
+        "llm_calls": 281,
+        "prompt_tokens": 5745090,
+        "total_tokens": 5846175,
+        "uncached_prompt_tokens": 428226
+      }
+    },
+    "online_challenge": {
+      "actual_task_ids": [
+        "476b213_1",
+        "476b213_2",
+        "476b213_3",
+        "5238afc_1",
+        "5238afc_2",
+        "5238afc_3",
+        "7bdaf23_1",
+        "7bdaf23_2",
+        "7bdaf23_3",
+        "adb1060_1",
+        "adb1060_2",
+        "adb1060_3",
+        "c8f5f44_1",
+        "c8f5f44_2",
+        "c8f5f44_3"
+      ],
+      "artifact_audit": {
+        "issue_count": 0,
+        "issues_by_task": {},
+        "valid": true
+      },
+      "dataset": "quick2h_test_challenge",
+      "evaluation_path": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/online_no_GT_test_challenge/evaluations/quick2h_test_challenge.json",
+      "expected_task_ids": [
+        "5238afc_1",
+        "5238afc_2",
+        "5238afc_3",
+        "c8f5f44_1",
+        "c8f5f44_2",
+        "c8f5f44_3",
+        "476b213_1",
+        "476b213_2",
+        "476b213_3",
+        "7bdaf23_1",
+        "7bdaf23_2",
+        "7bdaf23_3",
+        "adb1060_1",
+        "adb1060_2",
+        "adb1060_3"
+      ],
+      "experiment": "online_no_GT_test_challenge",
+      "extra_task_ids": [],
+      "key": "online_challenge",
+      "main_result": true,
+      "metrics": {
+        "by_difficulty": {
+          "1": {
+            "complete_families": 1,
+            "sgc": 0.0,
+            "success_families": 0,
+            "success_tasks": 1,
+            "tasks": 3,
+            "tgc": 33.3
+          },
+          "2": {
+            "complete_families": 2,
+            "sgc": 50.0,
+            "success_families": 1,
+            "success_tasks": 5,
+            "tasks": 6,
+            "tgc": 83.3
+          },
+          "3": {
+            "complete_families": 2,
+            "sgc": 50.0,
+            "success_families": 1,
+            "success_tasks": 3,
+            "tasks": 6,
+            "tgc": 50.0
+          }
+        },
+        "failed_tasks": [
+          "476b213_2",
+          "5238afc_2",
+          "5238afc_3",
+          "c8f5f44_1",
+          "c8f5f44_2",
+          "c8f5f44_3"
+        ],
+        "families": 5,
+        "sgc": 40.0,
+        "success_families": 2,
+        "success_map": {
+          "476b213_1": true,
+          "476b213_2": false,
+          "476b213_3": true,
+          "5238afc_1": true,
+          "5238afc_2": false,
+          "5238afc_3": false,
+          "7bdaf23_1": true,
+          "7bdaf23_2": true,
+          "7bdaf23_3": true,
+          "adb1060_1": true,
+          "adb1060_2": true,
+          "adb1060_3": true,
+          "c8f5f44_1": false,
+          "c8f5f44_2": false,
+          "c8f5f44_3": false
+        },
+        "success_tasks": 9,
+        "tasks": 15,
+        "tgc": 60.0
+      },
+      "missing_task_ids": [],
+      "mode": "online adaptive",
+      "no_complete_task_ids": [],
+      "output_root": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/online_no_GT_test_challenge",
+      "playbook": "online_no_GT_test_challenge.txt",
+      "split": "challenge",
+      "usage": {
+        "api_calls": 1333,
+        "cached_prompt_tokens": 5638400,
+        "completion_tokens": 378262,
+        "fixed_registry_cost_usd": 2.1291688,
+        "llm_calls": 356,
+        "prompt_tokens": 6983792,
+        "total_tokens": 7362054,
+        "uncached_prompt_tokens": 1345392
+      }
+    },
+    "online_normal": {
+      "actual_task_ids": [
+        "3aa1a22_1",
+        "3aa1a22_2",
+        "3aa1a22_3",
+        "3b8fb7a_1",
+        "3b8fb7a_2",
+        "3b8fb7a_3",
+        "59fae45_1",
+        "59fae45_2",
+        "59fae45_3",
+        "dac78d9_1",
+        "dac78d9_2",
+        "dac78d9_3",
+        "f323bae_1",
+        "f323bae_2",
+        "f323bae_3"
+      ],
+      "artifact_audit": {
+        "issue_count": 0,
+        "issues_by_task": {},
+        "valid": true
+      },
+      "dataset": "quick2h_test_normal",
+      "evaluation_path": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/online_no_GT_test_normal/evaluations/quick2h_test_normal.json",
+      "expected_task_ids": [
+        "3b8fb7a_1",
+        "3b8fb7a_2",
+        "3b8fb7a_3",
+        "f323bae_1",
+        "f323bae_2",
+        "f323bae_3",
+        "59fae45_1",
+        "59fae45_2",
+        "59fae45_3",
+        "dac78d9_1",
+        "dac78d9_2",
+        "dac78d9_3",
+        "3aa1a22_1",
+        "3aa1a22_2",
+        "3aa1a22_3"
+      ],
+      "experiment": "online_no_GT_test_normal",
+      "extra_task_ids": [],
+      "key": "online_normal",
+      "main_result": true,
+      "metrics": {
+        "by_difficulty": {
+          "1": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          },
+          "2": {
+            "complete_families": 1,
+            "sgc": 100.0,
+            "success_families": 1,
+            "success_tasks": 3,
+            "tasks": 3,
+            "tgc": 100.0
+          },
+          "3": {
+            "complete_families": 2,
+            "sgc": 100.0,
+            "success_families": 2,
+            "success_tasks": 6,
+            "tasks": 6,
+            "tgc": 100.0
+          }
+        },
+        "failed_tasks": [],
+        "families": 5,
+        "sgc": 100.0,
+        "success_families": 5,
+        "success_map": {
+          "3aa1a22_1": true,
+          "3aa1a22_2": true,
+          "3aa1a22_3": true,
+          "3b8fb7a_1": true,
+          "3b8fb7a_2": true,
+          "3b8fb7a_3": true,
+          "59fae45_1": true,
+          "59fae45_2": true,
+          "59fae45_3": true,
+          "dac78d9_1": true,
+          "dac78d9_2": true,
+          "dac78d9_3": true,
+          "f323bae_1": true,
+          "f323bae_2": true,
+          "f323bae_3": true
+        },
+        "success_tasks": 15,
+        "tasks": 15,
+        "tgc": 100.0
+      },
+      "missing_task_ids": [],
+      "mode": "online adaptive",
+      "no_complete_task_ids": [],
+      "output_root": "experiments/outputs/ACE_quick2h_offline_online/qwen3.8-flash/online_no_GT_test_normal",
+      "playbook": "online_no_GT_test_normal.txt",
+      "split": "normal",
+      "usage": {
+        "api_calls": 1145,
+        "cached_prompt_tokens": 5239808,
+        "completion_tokens": 406596,
+        "fixed_registry_cost_usd": 2.23988832,
+        "llm_calls": 317,
+        "prompt_tokens": 6712396,
+        "total_tokens": 7118992,
+        "uncached_prompt_tokens": 1472588
+      }
+    }
+  }
+}

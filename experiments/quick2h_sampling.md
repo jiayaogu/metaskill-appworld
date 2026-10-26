@@ -71,6 +71,21 @@ cover different levels of instruction similarity to the full training set.
 The normal sample includes a Splitwise scenario, and the challenge sample
 includes Amazon purchasing, Gmail/file handling, and email scheduling.
 
+### Ten-topic probability vectors
+
+The coordinate order for every vector is
+`[Amazon, Gmail, Todoist, Splitwise, Spotify, Venmo, Simple Note, Phone, File system, Other]`.
+Each scenario has weight 1; its three task variants each have weight 1/3,
+divided equally among the topics tagged in that variant. These are topic
+**probabilities**, not counts of scenarios mentioning an app. All entries are
+rounded to four decimal places.
+
+```text
+quick2h train          = [0.0000, 0.0000, 0.0000, 0.0000, 0.5000, 0.2000, 0.1000, 0.0000, 0.2000, 0.0000]
+quick2h test_normal    = [0.0000, 0.0000, 0.0000, 0.1000, 0.2000, 0.3000, 0.2000, 0.1000, 0.1000, 0.0000]
+quick2h test_challenge = [0.4333, 0.1000, 0.0000, 0.0000, 0.0667, 0.1000, 0.0000, 0.0000, 0.1000, 0.2000]
+```
+
 | Source split | Topic TV | Difficulty TV | App-count TV | Novelty-bin TV |
 | --- | ---: | ---: | ---: | ---: |
 | `train` | 0.0833 | 0.0000 | 0.1333 | — |
@@ -102,3 +117,92 @@ reliable estimate of full-split success rates or rare-task performance. Report
 pilot results separately from full-split results. AppWorld scenario goal
 completion can be computed because all three tasks of each selected scenario
 are included.
+
+## Normal v2 for difficulty-aware fast tests
+
+The original 15-task `quick2h_test_normal` is retained for its completed
+experiments. A separate, outcome-blind [normal v2 sample](samples/quick2h_normal_v2/README.md)
+provides 21 tasks from seven complete families under the name
+`quick2h_test_normal_v2`. It retains four original families, removes
+`3b8fb7a`, and adds `ff58e36`, `0a9d82a`, and `986aa4e` in full-split order.
+The original quick2h train manifest remains unchanged. Challenge now also has
+a separate v2 manifest described below; all completed v1 results remain tied
+to the original manifests.
+
+| Full-normal fidelity | Original normal | Normal v2 |
+| --- | ---: | ---: |
+| Topic TV | 0.1131 | **0.0982** |
+| Official difficulty TV | 0.0857 | **0.0536** |
+| App-count TV | 0.1107 | **0.0536** |
+| Quick2h train → normal topic TV | 0.4000 | 0.4143 |
+
+The full train → normal topic TV is 0.3476. Thus the new normal sample
+improves its own topic and intrinsic-difficulty match, while the retained
+train-to-normal shift is slightly too large. The three-split one-pass budget
+with original challenge is 15 + 21 + 15 = **51 tasks**. With challenge v2 it
+is 15 + 21 + 18 = **54 tasks**, estimated at **118.8 minutes** using the
+previous 2.2-minute/task rate. This is an estimate with almost no runtime slack,
+especially for complex tasks. The [manifest](samples/quick2h_normal_v2/test_normal.txt),
+[installed dataset](../data/datasets/quick2h_test_normal_v2.txt),
+[audit](samples/quick2h_normal_v2/audit.json), and
+[generator](code/sample_quick2h_normal_v2.py) are kept separate from v1.
+No ACE result has yet been measured on v2.
+
+## Challenge v2 for difficulty-aware fast tests
+
+The separate, outcome-blind [challenge v2 sample](samples/quick2h_challenge_v2/README.md)
+provides 18 tasks from six complete families under
+`quick2h_test_challenge_v2`. It retains four original families, removes
+`7bdaf23`, and adds `c9458ed` and `a3ba388` in full-split order.
+
+| Full-challenge fidelity | Original challenge | Challenge v2 |
+| --- | ---: | ---: |
+| Topic TV | 0.1448 | **0.1147** |
+| Official difficulty TV | 0.0676 | **0.0324** |
+| App-count TV | 0.1237 | **0.0983** |
+| Novelty-bin TV | 0.1482 | **0.0851** |
+| Quick2h train → challenge topic TV | 0.7333 | 0.7778 |
+
+The full train → challenge topic TV is 0.6595. Challenge v2 improves all four
+listed within-split fidelity measures but increases the train-to-challenge
+shift error from 0.0739 to 0.1183. It still preserves the intended ordering:
+challenge v2 is much farther from train than normal v2. The
+[manifest](samples/quick2h_challenge_v2/test_challenge.txt),
+[installed dataset](../data/datasets/quick2h_test_challenge_v2.txt),
+[audit](samples/quick2h_challenge_v2/audit.json), and
+[generator](code/sample_quick2h_challenge_v2.py) are separate from v1. No
+baseline result has yet been measured on challenge v2.
+
+## Train v2 for difficulty-aware fast tests
+
+The separate, outcome-blind [train v2 sample](samples/quick2h_train_v2/README.md)
+keeps the train allocation at 15 tasks from five complete families under
+`quick2h_train_v2`. It retains four original families and replaces the D1
+Spotify family `07b42fd` with the D1 Spotify family `e3d6c94` in full-train
+order. The replacement preserves topic, difficulty, app-count, and both
+train-to-test topic TVs while improving the intrinsic complexity match.
+
+| Full-train fidelity | Original train | Train v2 |
+| --- | ---: | ---: |
+| Topic TV | 0.0833 | 0.0833 |
+| Official difficulty TV | 0.0000 | 0.0000 |
+| App-count TV | 0.1333 | 0.1333 |
+| API-count quartile TV | 0.3000 | **0.1000** |
+| Reference API-call quartile TV | 0.1444 | **0.1111** |
+| Reference-code-length quartile TV | 0.2778 | **0.1222** |
+
+The complete v2 suite is therefore:
+
+```text
+quick2h_train_v2              15 tasks / 5 families
+quick2h_test_normal_v2        21 tasks / 7 families
+quick2h_test_challenge_v2     18 tasks / 6 families
+total                         54 tasks / 18 families
+```
+
+At 2.2 minutes per task this is estimated at 118.8 minutes, leaving only 1.2
+nominal minutes of slack. The [manifest](samples/quick2h_train_v2/train.txt),
+[installed dataset](../data/datasets/quick2h_train_v2.txt),
+[audit](samples/quick2h_train_v2/audit.json), and
+[generator](code/sample_quick2h_train_v2.py) are separate from v1. No baseline
+result has yet been measured on train v2.
