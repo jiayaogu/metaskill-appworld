@@ -1,0 +1,25 @@
+name: reme-formal12-repro
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5@sha256:13b4a40bb095774f5fda635e45fd5677cc6a26565e42b24997b0c72b88e75984
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.ml.enabled: "false"
+      xpack.license.self_generated.type: basic
+      ingest.geoip.downloader.enabled: "false"
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    ports:
+      - "127.0.0.1:19200:9200"
+    volumes:
+      - data:/usr/share/elasticsearch/data
+    mem_limit: 2g
+    cpus: 2
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 30s
+volumes:
+  data:

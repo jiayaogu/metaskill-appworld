@@ -1,0 +1,13 @@
+{
+  "index_patterns": ["reme_*"],
+  "priority": 100,
+  "_meta": {
+    "purpose": "Retain source vectors for the pinned ReMe AppWorld audit",
+    "source_commit": "2f37a15"
+  },
+  "template": {
+    "settings": {
+      "index.mapping.exclude_source_vectors": false
+    }
+  }
+}

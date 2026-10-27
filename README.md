@@ -2,6 +2,64 @@
 
 This guide sets up a clean ACE AppWorld environment from source.
 
+## Reproduce the ACE intermediate8h and quick2h v2 comparisons
+
+Clone this experiment repository, then use its [single reproduction script](scripts/reproduce_ace_appworld.sh). The script prepares an isolated workspace and executes the three ACE arms: offline adaptation, frozen-playbook evaluation, and online adaptation. Each comparison has one offline training run, two frozen tests sharing its new playbook, and two independent online streams: **10 sequential `appworld run` and `appworld evaluate` pairs** in total. `plan` prints the commands without calling the model.
+
+```bash
+git clone https://github.com/jgu13/metaskill-appworld.git ace-appworld
+cd ace-appworld
+bash scripts/reproduce_ace_appworld.sh plan
+bash scripts/reproduce_ace_appworld.sh setup
+read -r -s -p 'Qwen endpoint API key: ' OPENAI_API_KEY; echo; export OPENAI_API_KEY
+bash scripts/reproduce_ace_appworld.sh run
+```
+
+Use a revision containing `scripts/reproduce_ace_appworld.sh`; the pinned historical runner commit predates this guide. `bash scripts/reproduce_ace_appworld.sh all` combines setup and run once the key is available. Full runs make real provider calls. The key must work with the OpenAI-compatible Qwen3.8-flash endpoint specified in the configs; changing the endpoint or model changes the experiment conditions.
+
+**Pinned versions and environments.** The script clones [upstream ACE](https://github.com/ace-agent/ace.git) at [commit `82709de050e1db6e6ef2f07bcb0393560b94992a`](https://github.com/ace-agent/ace/commit/82709de050e1db6e6ef2f07bcb0393560b94992a) for its standalone environment. [Upstream ACE has no GitHub release](https://github.com/ace-agent/ace/releases). The actual AppWorld ACE integration runs from this fork at pinned commit `634d67c3bf54a2fb1fa55f4b1200a3ea91b162ce`; the script clones that commit into a separate workspace, leaving the checkout containing this README untouched. Install Git, Git LFS, Python 3.11, and [`uv`](https://docs.astral.sh/uv/getting-started/installation/) first. `setup` creates `.repro-ace-appworld/ace-reference/.venv` with `uv sync --frozen` (uv can obtain Python 3.12) and `.repro-ace-appworld/ace-appworld/.venv` with AppWorld installed from source, then downloads AppWorld data. Set `ACE_REPRO_WORKSPACE=/absolute/path/to/workspace` to change the destination.
+
+| Comparison | Offline adaptation | Frozen evaluation | Online adaptation |
+| --- | --- | --- | --- |
+| Intermediate8h | `intermediate_8h_train` (30 tasks) | `intermediate_8h_test_normal` (57), `intermediate_8h_test_challenge` (138) | The same test manifests, each with an independent playbook |
+| Quick2h v2 tests | **`quick2h_train` v1** (15 tasks) | `quick2h_test_normal_v2` (21), `quick2h_test_challenge_v2` (18) | The same v2 test manifests, each with an independent playbook |
+
+The historical quick2h v2 comparison used an offline playbook trained on **v1** `quick2h_train`. Training on `quick2h_train_v2` would test a different protocol. The checked-in configs are in [`ACE_intermediate_8h`](experiments/configs/ACE_intermediate_8h/qwen3.8-flash/), [`ACE_quick2h_v2_offline_online`](experiments/configs/ACE_quick2h_v2_offline_online/qwen3.8-flash/), and the v1 training config in [`ACE_quick2h_offline_online`](experiments/configs/ACE_quick2h_offline_online/qwen3.8-flash/). They specify the model alias, endpoint, seeds, prompts, 40-step limit, and no-ground-truth adaptation.
+
+New outputs appear under `.repro-ace-appworld/ace-appworld/experiments/outputs/`; the script refuses existing run directories and clears checked-in result playbooks only inside its isolated clone before training. Each task has `logs/lm_calls.jsonl`, `logs/environment_io.md`, `logs/api_calls.jsonl`, and `evaluation/report.md`; each run has `evaluations/<dataset>.json`. Compare TGC/SGC with the [intermediate8h](experiments/intermediate_8h_ace_offline_online_report.md) and [quick2h v2](experiments/quick2h_ace_offline_online_report.md) reports. The original quick2h v2 output used a retry name; new outputs use `ACE_quick2h_v2_offline_online`. Historical run outputs remain Git-ignored, and live model responses may change the reproduced scores.
+
+## Reproduce the ReMe AppWorld results
+
+Clone this [AppWorld fork](https://github.com/jiayaogu/metaskill-appworld), then use its [single reproduction script](scripts/reproduce_reme_formal12.sh). It prepares a separate workspace and runs the **12 formal ReMe cells**: fixed, dynamic, and cold start on Intermediate8h test normal/challenge and Quick2h **v2** test normal/challenge (702 ordered primary task attempts). This is the protocol reported in the [ReMe results report](experiments/intermediate_8h_reme_online_report.md). The experiment outputs are intentionally absent from Git; the script creates new local outputs.
+
+The [bundled ReMe source](baselines/reme2f37a15/) is the frozen code used by the formal campaign. It is based on upstream **`2f37a159b72a04ac1885a7db7f1a663a833e7791`** (ReMe v3/0.3.1.10 code line) with the audited AppWorld driver and approved `qwen3.8-flash` and sequential-execution changes. The archived [source patch](baselines/reme2f37a15/formal12-source.patch) records the changes from upstream; the script copies the ready-to-run source directly and does not apply the patch. It checks all 250 frozen ReMe source files against the campaign's [source hashes](baselines/reme2f37a15/source-sha256.json). It also clones this AppWorld fork at `634d67c3bf54a2fb1fa55f4b1200a3ea91b162ce`, which contains the four subset manifests and the shared call logger. That separate checkout keeps outputs out of the source tree.
+
+**Prerequisites:** Linux, Git and Git LFS, Python 3.11 with `venv`, Docker Compose, `curl`, network access to install packages and download AppWorld data, and API access to `qwen3.8-flash` and 1024-dimensional `text-embedding-v4`. The script creates two virtual environments: `.repro-reme/ace-appworld/.venv` for the AppWorld runner and `.repro-reme/ReMe-2f37a15/.venv` for the isolated ReMe service. Its default Elasticsearch container listens only on `127.0.0.1:19200` and keeps a persistent Docker volume.
+
+Create a provider file with your real credentials and compatible OpenAI-style base URLs; keep it outside Git. The chat endpoint must serve `qwen3.8-flash`, and the embedding endpoint must serve `text-embedding-v4`. For example, save this as `.repro-reme/provider.env` and replace the placeholders:
+
+```dotenv
+OPENAI_API_KEY=your-chat-api-key
+OPENAI_BASE_URL=https://your-chat-provider.example/v1
+DASHSCOPE_API_KEY=your-embedding-api-key
+DASHSCOPE_BASE_URL=https://your-embedding-provider.example/compatible-mode/v1
+```
+
+Clone this repository and run **one script** from its root after creating the provider file:
+
+```bash
+git clone https://github.com/jiayaogu/metaskill-appworld.git ace-appworld
+cd ace-appworld
+# Save the provider.env values above in .repro-reme/provider.env first.
+bash scripts/reproduce_reme_formal12.sh all "$PWD/.repro-reme/provider.env"
+```
+
+`all` installs the two environments and AppWorld data, starts Elasticsearch, plans the matrix, and executes the runs with real, billable API calls. Use `setup` to prepare only, then `run /absolute/path/to/provider.env` to execute later. Setup checks the frozen hashes and runs 97 provider-free ReMe tests; two historical tests requiring the original ReMe Git history are excluded from this vendored-source setup. Set `REME_CAMPAIGN=<same-name>` to resume a started campaign; without it, each invocation creates a fresh campaign name. `REME_ES_URL` selects an existing Elasticsearch service instead of starting Docker. The script generates an uncapped formal accounting policy with the original experiment's historical USD-per-million-token rates; set the `REME_*_RATE` variables listed in `--help` to price a different provider. These rates affect **estimated cost**, not benchmark scoring.
+
+The ReMe experiment settings live in [`baselines/reme2f37a15/benchmark/appworld/execution_matrix.py`](baselines/reme2f37a15/benchmark/appworld/execution_matrix.py) and [`baselines/reme2f37a15/reme/config/service.yaml`](baselines/reme2f37a15/reme/config/service.yaml); the bundled starting memory is `baselines/reme2f37a15/docs/library/paper_data/task/appworld_qwen3_8b.jsonl`. The four ordered task lists are in `.repro-reme/ace-appworld/data/datasets/{intermediate_8h_test_normal,intermediate_8h_test_challenge,quick2h_test_normal_v2,quick2h_test_challenge_v2}.txt`. The `experiments/configs/ACE_*/` JSONnet files configure **ACE**, not these ReMe runs. The [dependency constraints](baselines/reme2f37a15/constraints.txt), [Elasticsearch setup](baselines/reme2f37a15/compose.yaml), and [index template](baselines/reme2f37a15/index-template.json) are tracked with the source.
+
+Results are saved under `.repro-reme/ace-appworld/experiments/outputs/reme_<campaign>_<dataset>_<arm>_r01_qwen3.8-flash_run_0/`. Each completed run has `evaluations/<dataset>.json`, `run_manifest.json`, task logs under `tasks/<task-id>/logs/`, memory events under `baseline_artifacts/reme/<task-id>/memory_events.jsonl`, and `cost_evidence.json`. The campaign summary is under `experiments/outputs/.reme-formal-campaigns/<campaign>/coordinator_summary.json`. Live model responses can vary, so scores need not be byte-for-byte identical to the historical report.
+
 ## Prerequisites
 
 ```bash
