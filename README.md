@@ -113,7 +113,7 @@ three task variants.
 
 # Completed ReMe formal runs and task traces
 
-The `formal12-20261025-a` campaign completed all 12 ReMe runs and 702 ordered task attempts. Here, “completed” means the run and its official evaluation finished; individual benchmark tasks may still have failed. These outputs are **local to this workstation (70.28.108.234) and are not in the GitHub repository**. The table uses complete absolute paths, not online links. The tracked [ReMe results report](experiments/intermediate_8h_reme_online_report.md) summarizes scores and costs.
+The `formal12-20261025-a` campaign completed all 12 ReMe runs and 702 ordered task attempts. Here, “completed” means the run and its official evaluation finished; individual benchmark tasks may still have failed. These outputs are **local to this workstation (70.28.108.234) and are not in the GitHub repository**. The table uses complete absolute paths, not online links. The tracked [ReMe results report](experiments/intermediate_8h_reme_online_report.md) summarizes scores and costs. A comprehensive failure case analysis can be found at [ReMe Failure case analysis](experiments/Intermediate_8h_reme_online_failure_case_analysis.md).
 
 | Dataset | Arm | Complete path on this workstation | Aggregate JSON | Example task ID |
 | --- | --- | --- | --- | --- |
