@@ -90,7 +90,28 @@ local generator_model_config = {
 # Task loader and evaluator APIs 
 Guidance on how to load task datasets and how to produce per-task evaluation output layout is written in [TASKLOADER_AND_EVALUATOR_AND_OUTPUT_README.md](TASKLOADER_AND_EVALUATOR_AND_OUTPUT_README.md)
 
-## Completed ReMe formal runs and task traces
+# Experiment datasets
+
+Dataset manifests are stored under `data/datasets/`. The task counts below are
+computed from the non-empty task IDs in each manifest. Every scenario contains
+three task variants.
+
+| Dataset | Split | Manifest | Scenarios | Tasks |
+| --- | --- | --- | ---: | ---: |
+| Intermediate8h | Train | [`data/datasets/intermediate_8h_train.txt`](data/datasets/intermediate_8h_train.txt) | 10 | 30 |
+| Intermediate8h | Test normal | [`data/datasets/intermediate_8h_test_normal.txt`](data/datasets/intermediate_8h_test_normal.txt) | 19 | 57 |
+| Intermediate8h | Test challenge | [`data/datasets/intermediate_8h_test_challenge.txt`](data/datasets/intermediate_8h_test_challenge.txt) | 46 | 138 |
+| **Intermediate8h total** |  |  | **75** | **225** |
+| Quick2h | Train | [`data/datasets/quick2h_train.txt`](data/datasets/quick2h_train.txt) | 5 | 15 |
+| Quick2h | Test normal | [`data/datasets/quick2h_test_normal.txt`](data/datasets/quick2h_test_normal.txt) | 5 | 15 |
+| Quick2h | Test challenge | [`data/datasets/quick2h_test_challenge.txt`](data/datasets/quick2h_test_challenge.txt) | 5 | 15 |
+| **Quick2h total** |  |  | **15** | **45** |
+| Quick2h v2 | Train | [`data/datasets/quick2h_train_v2.txt`](data/datasets/quick2h_train_v2.txt) | 5 | 15 |
+| Quick2h v2 | Test normal | [`data/datasets/quick2h_test_normal_v2.txt`](data/datasets/quick2h_test_normal_v2.txt) | 7 | 21 |
+| Quick2h v2 | Test challenge | [`data/datasets/quick2h_test_challenge_v2.txt`](data/datasets/quick2h_test_challenge_v2.txt) | 6 | 18 |
+| **Quick2h v2 total** |  |  | **18** | **54** |
+
+# Completed ReMe formal runs and task traces
 
 The `formal12-20261025-a` campaign completed all 12 ReMe runs and 702 ordered task attempts. Here, “completed” means the run and its official evaluation finished; individual benchmark tasks may still have failed. These outputs are **local to this workstation and are not in the GitHub repository**. The table uses complete absolute paths, not online links. The tracked [ReMe results report](experiments/intermediate_8h_reme_online_report.md) summarizes scores and costs.
 
@@ -141,7 +162,7 @@ For example, these are the complete local paths for task `ff58e36_1` in the quic
 /home/jiayao/Metaskill-library/baselines/ace/ace-appworld/experiments/outputs/reme_formal12-20261025-a_quick2h_test_normal_v2_fixed_r01_qwen3.8-flash_run_0/baseline_artifacts/reme/ff58e36_1/memory_events.jsonl
 ```
 
-## Completed ACE run outputs and task traces
+# Completed ACE run outputs and task traces
 
 These 14 Qwen3.8-flash comparison runs are stored **on this workstation**, outside Git. GitHub cannot open their run files. The table uses complete local paths so another user on the same workstation can find them directly. “Completed” means an official aggregate evaluation exists; individual tasks may still have failed.
 
