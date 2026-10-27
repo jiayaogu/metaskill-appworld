@@ -92,7 +92,7 @@ Guidance on how to load task datasets and how to produce per-task evaluation out
 
 ## Completed ReMe formal runs and task traces
 
-The `formal12-20261025-a` campaign completed all 12 ReMe runs and 702 ordered task attempts. Here, “completed” means the run and its official evaluation finished; individual benchmark tasks may still have failed. These outputs are **local to this workstation and are not in the GitHub repository**. The table uses complete absolute paths, not online links. The tracked [ReMe results report](experiments/intermediate_8h_reme_online_report.md) summarizes scores and costs.
+The `formal12-20261025-a` campaign completed all 12 ReMe runs and 702 ordered task attempts. Here, “completed” means the run and its official evaluation finished; individual benchmark tasks may still have failed. These outputs are **local to this workstation (70.28.108.234) and are not in the GitHub repository**. The table uses complete absolute paths, not online links. The tracked [ReMe results report](experiments/intermediate_8h_reme_online_report.md) summarizes scores and costs.
 
 | Dataset | Arm | Complete path on this workstation | Aggregate JSON | Example task ID |
 | --- | --- | --- | --- | --- |
@@ -143,7 +143,7 @@ For example, these are the complete local paths for task `ff58e36_1` in the quic
 
 ## Completed ACE run outputs and task traces
 
-These 14 Qwen3.8-flash comparison runs are stored **on this workstation**, outside Git. GitHub cannot open their run files. The table uses complete local paths so another user on the same workstation can find them directly. “Completed” means an official aggregate evaluation exists; individual tasks may still have failed.
+These 14 Qwen3.8-flash comparison runs are stored **on this workstation (70.28.108.234)**, outside Git. GitHub cannot open their run files. The table uses complete local paths so another user on the same workstation can find them directly. “Completed” means an official aggregate evaluation exists; individual tasks may still have failed.
 
 To make these runs appear under `experiments/outputs/` in another checkout on this workstation, run this from that checkout’s `ace-appworld/` directory:
 
