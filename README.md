@@ -30,11 +30,11 @@ Clone this [AppWorld fork](https://github.com/jiayaogu/metaskill-appworld), then
 
 Use a revision containing `baselines/reme2f37a15/` and `scripts/reproduce_reme_formal12.sh`.
 
-The [bundled ReMe source](baselines/reme2f37a15/) is the frozen code used by the formal campaign. It is based on upstream **`2f37a159b72a04ac1885a7db7f1a663a833e7791`** (ReMe v3/0.3.1.10 code line) with the audited AppWorld driver and approved `qwen3.8-flash` and sequential-execution changes. The launcher's `check` verifies that the required ReMe/AppWorld source, four dataset manifests, shared call logger, and setup asset paths exist. `setup` refreshes the ReMe runtime copy from this checkout. 
+The [bundled ReMe source](baselines/reme2f37a15/) is the frozen code used by the formal campaign. It is based on upstream **`2f37a159b72a04ac1885a7db7f1a663a833e7791`** (ReMe v3/0.3.1.10 code line) with the audited AppWorld driver and approved `qwen3.8-flash` and sequential-execution changes. The launcher's `check` verifies that the required ReMe/AppWorld source, four dataset manifests, shared call logger, and setup asset paths exist. `setup` installs the bundled source in editable mode; planning and execution run directly from that tree.
 
-**Prerequisites:** Linux, Git and Git LFS, Python 3.11 with `venv`, Docker Compose, `curl`, network access to install packages and download AppWorld data, and API access to `qwen3.8-flash` and 1024-dimensional `text-embedding-v4`. ReMe uses the same `.venv-appworld/` built by [the shared setup script](scripts/setup_appworld_venv.sh); its separate service environment is `.repro-reme/ReMe-2f37a15/.venv`. Its default Elasticsearch container listens only on `127.0.0.1:19200` and keeps a persistent Docker volume.
+**Prerequisites:** Linux, Git and Git LFS, Python 3.11 with `venv`, Docker Compose, `curl`, network access to install packages and download AppWorld data, and API access to `qwen3.8-flash` and 1024-dimensional `text-embedding-v4`. ReMe uses the same `.venv-appworld/` built by [the shared setup script](scripts/setup_appworld_venv.sh); its separate service environment is `.venv-reme/` at the repository root. Its default Elasticsearch container listens only on `127.0.0.1:19200` and keeps a persistent Docker volume.
 
-Create a provider file with your real credentials and compatible OpenAI-style base URLs; keep it outside Git. The chat endpoint must serve `qwen3.8-flash`, and the embedding endpoint must serve `text-embedding-v4`. For example, save this as `.repro-reme/provider.env` and replace the placeholders:
+Create a provider file with your real credentials and compatible OpenAI-style base URLs; keep it outside the repository. The chat endpoint must serve `qwen3.8-flash`, and the embedding endpoint must serve `text-embedding-v4`. For example, save this as `$HOME/reme-provider.env` and replace the placeholders:
 
 ```dotenv
 OPENAI_API_KEY=your-chat-api-key
@@ -49,12 +49,27 @@ Clone this repository and run **one script** from its root after creating the pr
 git clone https://github.com/jiayaogu/metaskill-appworld.git ace-appworld
 cd ace-appworld
 bash scripts/reproduce_reme_formal12.sh check
-mkdir -p .repro-reme
-# Save the provider.env values above in .repro-reme/provider.env first.
-bash scripts/reproduce_reme_formal12.sh all "$PWD/.repro-reme/provider.env"
+# Save the provider.env values above in "$HOME/reme-provider.env" first.
+bash scripts/reproduce_reme_formal12.sh all "$HOME/reme-provider.env"
 ```
 
-`check` verifies that required source and dataset paths exist without installing packages or calling a model. `all` invokes the shared AppWorld setup, installs the separate ReMe service environment, starts Elasticsearch, plans the matrix, and executes the runs with real, billable API calls. Use `setup` to prepare only, then `run /absolute/path/to/provider.env` to execute later. Setup runs 97 provider-free ReMe tests; two historical tests requiring the original ReMe Git history are excluded from this vendored-source setup. Set `REME_CAMPAIGN=<same-name>` to resume a started campaign; without it, each invocation creates a fresh campaign name. `REME_ES_URL` selects an existing Elasticsearch service instead of starting Docker. The script generates an uncapped formal accounting policy with the original experiment's historical USD-per-million-token rates; set the `REME_*_RATE` variables listed in `--help` to price a different provider. These rates affect **estimated cost**, not benchmark scoring.
+`check` verifies that required source and dataset paths exist without installing packages or calling a model. `all` invokes the shared AppWorld setup, installs the separate ReMe service environment, starts Elasticsearch, plans the matrix, and executes the runs with real, billable API calls. Use `setup` to prepare only, then `run /absolute/path/to/provider.env` to execute later. Setup runs 97 provider-free ReMe tests; two historical tests requiring the original ReMe Git history are excluded from this vendored-source setup. Set `REME_CAMPAIGN=<same-name>` to resume a started campaign; without it, each invocation creates a fresh campaign name. `REME_ES_URL` selects an existing Elasticsearch service instead of starting Docker. The script generates an uncapped formal accounting policy with the original experiment's historical USD-per-million-token rates; set the `REME_*_RATE` variables listed in `--help` to price a different provider. These rates affect **estimated cost**, not benchmark scoring. The policy and its append-only ledger are saved in `experiments/outputs/.reme-formal-campaigns/<campaign>/` beside the run outputs.
+
+The resulting checkout layout is:
+
+```text
+ace-appworld/
+├── baselines/reme2f37a15/                 # ReMe source and setup assets
+├── scripts/reproduce_reme_formal12.sh
+├── .venv-appworld/                         # shared ACE/AppWorld runtime, Git-ignored
+├── .venv-reme/                             # ReMe service dependencies, Git-ignored
+└── experiments/outputs/                   # generated results, Git-ignored
+    ├── .reme-formal-campaigns/<campaign>/
+    │   ├── accounting_policy.json
+    │   ├── accounting_policy.ledger.jsonl
+    │   └── coordinator_summary.json
+    └── reme_<campaign>_<dataset>_<arm>_r01_qwen3.8-flash_run_0/
+```
 
 The ReMe experiment settings live in [`baselines/reme2f37a15/benchmark/appworld/execution_matrix.py`](baselines/reme2f37a15/benchmark/appworld/execution_matrix.py) and [`baselines/reme2f37a15/reme/config/service.yaml`](baselines/reme2f37a15/reme/config/service.yaml); the bundled starting memory is `baselines/reme2f37a15/docs/library/paper_data/task/appworld_qwen3_8b.jsonl`. The [dependency constraints](baselines/reme2f37a15/constraints.txt), [Elasticsearch setup](baselines/reme2f37a15/compose.yaml), and [index template](baselines/reme2f37a15/index-template.json) are tracked with the source.
 

@@ -3,13 +3,12 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-# The AppWorld checkout supplies datasets and runner code; ReMe is bundled below.
+# The AppWorld checkout supplies datasets and runner code; ReMe runs in place.
 source_root="$repo_root/baselines/reme2f37a15"
 assets="$source_root"
-# ReMe's runtime copy, service environment, and provider.env live here.
-workspace=${REME_REPRO_WORKSPACE:-"$repo_root/.repro-reme"}
 appworld="$repo_root"
 appworld_venv="$repo_root/.venv-appworld"
+reme_venv="$repo_root/.venv-reme"
 
 usage() {
   cat <<'USAGE'
@@ -20,25 +19,25 @@ Usage:
   bash scripts/reproduce_reme_formal12.sh all /absolute/path/to/provider.env
 
 check verifies required dataset, AppWorld, and bundled ReMe source paths exist.
-setup prepares the shared AppWorld environment, copies the bundled ReMe
-source, and creates its separate Python 3.11 service environment.
+setup prepares the shared AppWorld environment and a separate Python 3.11
+ReMe service environment. The bundled ReMe source runs in place.
 run starts a dedicated local Elasticsearch container (unless REME_ES_URL is set),
 plans 12 cells, and executes 702 primary task attempts with real provider calls.
 Set REME_CAMPAIGN to resume a previously started campaign; otherwise each run gets
-a fresh campaign name. Outputs are written to this checkout at
+a fresh campaign name. Outputs and campaign accounting are written under
   experiments/outputs/.
 
 Optional: REME_CHAT_INPUT_RATE, REME_CHAT_OUTPUT_RATE, REME_CHAT_CACHED_RATE,
 REME_EMBED_INPUT_RATE (USD per million tokens, historical defaults 0.64, 2.16,
 0.08, 0.07); REME_FORMAL_ACCOUNTING_POLICY; REME_BASE_PORT; REME_TASK_TIMEOUT;
-REME_RUNTIME_ROOT; REME_ES_URL; REME_REPRO_WORKSPACE.
+REME_RUNTIME_ROOT; REME_ES_URL.
 USAGE
 }
 
 fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "Required command missing: $1"; }
 
-# Check either the bundled ReMe tree or the runtime copy used by the executor.
+# Check the bundled ReMe tree used by the executor.
 check_reme_source() {
   local root=$1 relative
   for relative in \
@@ -77,22 +76,15 @@ setup() {
   check_sources
   bash "$repo_root/scripts/setup_appworld_venv.sh" setup
   # Keep the ReMe service environment separate from the shared AppWorld runner.
-  mkdir -p "$workspace"
-  workspace=$(cd "$workspace" && pwd -P)
-  reme="$workspace/ReMe-2f37a15"
   # The shared setup has hydrated AppWorld's Git LFS files.
   check_sources
-  # Refresh the runtime source from this checkout while retaining its service venv.
-  mkdir -p "$reme"
-  cp -a "$source_root/." "$reme/"
-  check_reme_source "$reme"
-  if [[ ! -x "$reme/.venv/bin/python" ]]; then python3.11 -m venv "$reme/.venv"; fi
-  "$reme/.venv/bin/python" -m pip install --upgrade pip setuptools wheel
-  "$reme/.venv/bin/python" -m pip install -c "$assets/constraints.txt" -e "$reme[light,ray]" 'sqlalchemy[asyncio]'
-  "$reme/.venv/bin/python" -m pip check
-  "$reme/.venv/bin/python" -c 'from reme.reme import ReMe; from reme.core.service.http_service import HttpService'
+  if [[ ! -x "$reme_venv/bin/python" ]]; then python3.11 -m venv "$reme_venv"; fi
+  "$reme_venv/bin/python" -m pip install --upgrade pip setuptools wheel
+  "$reme_venv/bin/python" -m pip install -c "$assets/constraints.txt" -e "$source_root[light,ray]" 'sqlalchemy[asyncio]'
+  "$reme_venv/bin/python" -m pip check
+  "$reme_venv/bin/python" -c 'from reme.reme import ReMe; from reme.core.service.http_service import HttpService'
   # Point offline tests at this checkout. Two parity tests need upstream ReMe Git history.
-  (cd "$reme" && APPWORLD_PROJECT_PATH="$appworld" PYTHONWARNINGS=ignore "$appworld_venv/bin/python" - <<'PY'
+  (cd "$source_root" && APPWORLD_PROJECT_PATH="$appworld" PYTHONWARNINGS=ignore "$appworld_venv/bin/python" - <<'PY'
 import os
 import sys
 import unittest
@@ -126,7 +118,7 @@ result = unittest.TextTestRunner(verbosity=1).run(unittest.TestSuite(selected))
 sys.exit(0 if result.wasSuccessful() else 1)
 PY
   )
-  printf 'Setup complete: %s\n' "$workspace"
+  printf 'Setup complete: ReMe source %s; service environment %s\n' "$source_root" "$reme_venv"
 }
 
 # Build the campaign's immutable cost policy from provider URLs and token rates.
@@ -137,9 +129,10 @@ write_accounting_policy() {
     policy=$(cd "$(dirname "$REME_FORMAL_ACCOUNTING_POLICY")" && pwd -P)/$(basename "$REME_FORMAL_ACCOUNTING_POLICY")
     return
   fi
-  mkdir -p "$workspace/accounting"
-  policy="$workspace/accounting/$campaign.json"
-  "$reme/.venv/bin/python" - "$provider_file" "$policy" <<'PY'
+  local campaign_state="$appworld/experiments/outputs/.reme-formal-campaigns/$campaign"
+  mkdir -p "$campaign_state"
+  policy="$campaign_state/accounting_policy.json"
+  "$reme_venv/bin/python" - "$provider_file" "$policy" <<'PY'
 import json, os, sys
 from pathlib import Path
 from dotenv import dotenv_values
@@ -202,7 +195,7 @@ prepare_elasticsearch() {
   # If the template already exists, verify its required setting before reuse.
   if ! curl --fail --silent --show-error -X PUT "$template_url?create=true" \
       -H 'Content-Type: application/json' --data-binary "@$assets/index-template.json" >/dev/null 2>&1; then
-    curl --fail --silent --show-error "$template_url" | "$reme/.venv/bin/python" -c '
+    curl --fail --silent --show-error "$template_url" | "$reme_venv/bin/python" -c '
 import json,sys
 value=json.load(sys.stdin)["index_templates"][0]["index_template"]["template"]["settings"]
 setting=value.get("index.mapping.exclude_source_vectors")
@@ -219,11 +212,7 @@ run() {
   bash "$repo_root/scripts/setup_appworld_venv.sh" check
   [[ $# == 1 && -f $1 ]] || fail "run needs an existing provider .env file"
   provider_file=$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")
-  mkdir -p "$workspace"
-  workspace=$(cd "$workspace" && pwd -P)
-  reme="$workspace/ReMe-2f37a15"
-  [[ -x "$reme/.venv/bin/python" ]] || fail "Run ReMe setup first"
-  check_reme_source "$reme"
+  [[ -x "$reme_venv/bin/python" ]] || fail "Run ReMe setup first"
   campaign=${REME_CAMPAIGN:-repro-$(date -u +%Y%m%d-%H%M%S)}
   [[ $campaign =~ ^[a-z0-9][a-z0-9_-]{0,39}$ ]] || fail "Invalid campaign name"
   write_accounting_policy
@@ -249,17 +238,17 @@ PY
   shopt -u nullglob
   # Plan a new campaign once; preserve all twelve manifests on resume.
   if (( ${#manifests[@]} == 0 )); then
-    (cd "$reme" && "$appworld_venv/bin/python" benchmark/appworld/execution_matrix.py \
+    (cd "$source_root" && "$appworld_venv/bin/python" benchmark/appworld/execution_matrix.py \
       --appworld-root "$appworld" --campaign "$campaign" --formal-accounting "$policy")
   elif (( ${#manifests[@]} != 12 )); then
     fail "Campaign $campaign has ${#manifests[@]} manifests; expected 12"
   fi
   # The coordinator owns run scheduling, task order, recovery, and provider calls.
   printf 'Starting campaign %s; this makes real provider calls.\n' "$campaign"
-  (cd "$reme" && "$appworld_venv/bin/python" benchmark/appworld/execution_coordinator.py \
+  (cd "$source_root" && "$appworld_venv/bin/python" benchmark/appworld/execution_coordinator.py \
     --execute-formal --appworld-root "$appworld" --campaign "$campaign" \
     --env-file "$provider_file" --formal-accounting "$policy" \
-    --service-python "$reme/.venv/bin/python" --es-url "$es_url" \
+    --service-python "$reme_venv/bin/python" --es-url "$es_url" \
     --task-timeout "${REME_TASK_TIMEOUT:-3600}" \
     --base-port "${REME_BASE_PORT:-18101}" \
     --runtime-root "${REME_RUNTIME_ROOT:-/tmp/rr}")
