@@ -5,10 +5,25 @@ set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 workspace=${ACE_REPRO_WORKSPACE:-"$repo_root/.repro-ace-appworld"}
 [[ $workspace == /* ]] || workspace=$repo_root/$workspace
-ace_url=https://github.com/ace-agent/ace.git
-ace_commit=82709de050e1db6e6ef2f07bcb0393560b94992a
-appworld_url=https://github.com/jgu13/metaskill-appworld.git
-appworld_commit=634d67c3bf54a2fb1fa55f4b1200a3ea91b162ce
+venv=$repo_root/.venv-appworld
+
+# Required source and input paths supplied by the user's AppWorld checkout.
+required_paths=(
+  pyproject.toml
+  experiments/setup.py
+  experiments/__init__.py
+  experiments/code/__init__.py
+  src/appworld
+  experiments/code/ace
+  experiments/code/common
+  experiments/configs/ACE_intermediate_8h
+  experiments/configs/ACE_quick2h_offline_online
+  experiments/configs/ACE_quick2h_v2_offline_online
+  data/datasets
+  experiments/prompts
+  experiments/playbooks/appworld_initial_playbook.txt
+  scripts/setup_appworld_venv.sh
+)
 
 runs=(
   ACE_intermediate_8h/qwen3.8-flash/offline_no_GT_adaptation
@@ -35,49 +50,62 @@ datasets=(
   quick2h_test_challenge_v2
 )
 expected_counts=(30 57 138 57 138 15 21 18 21 18)
+playbooks=(
+  intermediate_offline.txt
+  intermediate_offline.txt
+  intermediate_offline.txt
+  intermediate_online_normal.txt
+  intermediate_online_challenge.txt
+  quick_offline.txt
+  quick_offline.txt
+  quick_offline.txt
+  quick_online_normal.txt
+  quick_online_challenge.txt
+)
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/reproduce_ace_appworld.sh {plan|setup|run|all}
+Usage: bash scripts/reproduce_ace_appworld.sh {plan|check|setup|run|all}
 
   plan   Print the 10 run/evaluate pairs; no network or model calls.
-  setup  Clone pinned ACE and AppWorld sources into ACE_REPRO_WORKSPACE,
-         create separate virtual environments, and install AppWorld data.
+  check  Verify required ACE/AppWorld source and experiment input paths exist.
+  setup  Prepare the shared AppWorld environment and install AppWorld data.
   run    Execute all 10 runs sequentially, then official evaluations.
   all    setup followed by run.
 
-Set ACE_REPRO_WORKSPACE to choose an empty, persistent workspace. The default
-is <this repository>/.repro-ace-appworld. `run` requires OPENAI_API_KEY and
-uses the Qwen3.8-flash endpoint defined in the checked-in Jsonnet configs.
-It makes real provider calls. Existing output directories are never overwritten.
+The checked-out AppWorld repository supplies the ACE runner; no ACE or AppWorld
+clone is created. The shared environment is <this repository>/.venv-appworld.
+Set ACE_REPRO_WORKSPACE for new playbooks (default: .repro-ace-appworld).
+Run outputs go to
+this repository's experiments/outputs/. `run` requires OPENAI_API_KEY and makes
+real provider calls. Existing output or playbook paths are never overwritten.
 EOF
 }
 
 fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
-need() { command -v "$1" >/dev/null 2>&1 || fail "Required command missing: $1"; }
-
-clone_pin() {
-  local url=$1 destination=$2 commit=$3
-  if [[ ! -e $destination ]]; then
-    git clone -- "$url" "$destination"
-  fi
-  [[ -d $destination/.git ]] || fail "Not a Git checkout: $destination"
-  if [[ $(git -C "$destination" rev-parse HEAD) != "$commit" ]]; then
-    [[ -z $(git -C "$destination" status --porcelain) ]] || fail "Dirty checkout: $destination"
-    git -C "$destination" cat-file -e "$commit^{commit}" 2>/dev/null || git -C "$destination" fetch origin "$commit"
-    git -C "$destination" checkout --detach "$commit"
-  fi
-  [[ $(git -C "$destination" rev-parse HEAD) == "$commit" ]] || fail "Wrong source commit: $destination"
+check_checkout() {
+  local path run dataset
+  for path in "${required_paths[@]}"; do
+    [[ -e $repo_root/$path ]] || fail "Missing required path: $path"
+  done
+  for run in "${runs[@]}"; do
+    [[ -f $repo_root/experiments/configs/$run.jsonnet ]] || fail "Missing config: $run"
+  done
+  for dataset in "${datasets[@]}"; do
+    [[ -f $repo_root/data/datasets/$dataset.txt ]] || fail "Missing dataset: $dataset"
+  done
+  printf 'Checkout OK: required ACE/AppWorld source and experiment input paths exist.\n'
 }
 
 print_plan() {
-  printf 'ACE reference: %s @ %s\n' "$ace_url" "$ace_commit"
-  printf 'AppWorld runner: %s @ %s\n' "$appworld_url" "$appworld_commit"
-  printf 'Workspace: %s\n' "$workspace"
-  printf 'Config root: <workspace>/ace-appworld/experiments/configs/\n'
-  printf 'Output root: <workspace>/ace-appworld/experiments/outputs/\n'
+  printf 'ACE/AppWorld checkout: %s\n' "$repo_root"
+  printf 'Shared AppWorld environment: %s\n' "$venv"
+  printf 'New playbooks: %s/playbooks/\n' "$workspace"
+  printf 'Config root: %s/experiments/configs/\n' "$repo_root"
+  printf 'Output root: %s/experiments/outputs/\n' "$repo_root"
   for i in "${!runs[@]}"; do
-    printf '%2d. appworld run %s --root .\n' "$((i + 1))" "${runs[$i]}"
+    printf '%2d. appworld run %s --override <playbook: %s> --root .\n' \
+      "$((i + 1))" "${runs[$i]}" "${playbooks[$i]}"
     printf '    appworld evaluate %s %s --root .  (%s tasks)\n' \
       "${runs[$i]}" "${datasets[$i]}" "${expected_counts[$i]}"
   done
@@ -85,31 +113,13 @@ print_plan() {
 }
 
 setup() {
-  need git
-  need git-lfs
-  need python3.11
-  need uv
-  mkdir -p -- "$workspace"
-  workspace=$(cd -- "$workspace" && pwd -P)
-  local ace_ref=$workspace/ace-reference
-  local appworld=$workspace/ace-appworld
-  clone_pin "$ace_url" "$ace_ref" "$ace_commit"
-  clone_pin "$appworld_url" "$appworld" "$appworld_commit"
-  (cd "$ace_ref" && uv sync --frozen)
-  git -C "$appworld" lfs install --local
-  git -C "$appworld" lfs pull
-  if [[ ! -x $appworld/.venv/bin/python ]]; then python3.11 -m venv "$appworld/.venv"; fi
-  "$appworld/.venv/bin/python" -m pip install --upgrade pip setuptools wheel
-  (cd "$appworld" && .venv/bin/python -m pip install -e . -e 'experiments[simplified]')
-  (cd "$appworld" && APPWORLD_PROJECT_PATH="$appworld" .venv/bin/appworld install --repo)
-  (cd "$appworld" && APPWORLD_PROJECT_PATH="$appworld" .venv/bin/appworld download data)
-  "$appworld/.venv/bin/python" -m pip check
-  printf 'Setup complete. ACE venv: %s/.venv; AppWorld runner venv: %s/.venv\n' "$ace_ref" "$appworld"
+  check_checkout
+  bash "$repo_root/scripts/setup_appworld_venv.sh" setup
+  printf 'Setup complete. AppWorld/ACE environment: %s\n' "$venv"
 }
 
 check_inputs() {
-  local appworld=$1
-  "$appworld/.venv/bin/python" - "$appworld" <<'PY'
+  "$venv/bin/python" - "$repo_root" <<'PY'
 import sys
 from pathlib import Path
 from appworld.task import Task, load_task_ids
@@ -133,26 +143,18 @@ for dataset, count in expected.items():
 PY
 }
 
-clear_reference_playbooks() {
-  local appworld=$1
-  local folder file relative
-  for folder in \
-    experiments/playbooks/intermediate_8h/qwen3.8-flash \
-    experiments/playbooks/quick2h_offline_online/qwen3.8-flash \
-    experiments/playbooks/quick2h_v1train_v2test_20261026_retry1/qwen3.8-flash; do
-    while IFS= read -r -d '' file; do
-      relative=${file#"$appworld"/}
-      git -C "$appworld" ls-files --error-unmatch -- "$relative" >/dev/null 2>&1 || fail "Untracked playbook: $file"
-      git -C "$appworld" show "HEAD:$relative" | cmp -s - "$file" || fail "Modified playbook: $file"
-      rm -- "$file"
-    done < <(find "$appworld/$folder" -maxdepth 1 -type f -name '*.txt' -print0)
-  done
-  printf 'Cleared checked-in result playbooks from the isolated runner clone.\n'
+make_override() {
+  local playbook=$1
+  "$venv/bin/python" - "$playbook" <<'PY'
+import json
+import sys
+print(json.dumps({"config": {"agent": {"trained_playbook_file_path": sys.argv[1]}}}))
+PY
 }
 
 verify_result() {
-  local appworld=$1 run=$2 dataset=$3 count=$4
-  "$appworld/.venv/bin/python" - "$appworld" "$run" "$dataset" "$count" <<'PY'
+  local run=$1 dataset=$2 count=$3
+  "$venv/bin/python" - "$repo_root" "$run" "$dataset" "$count" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -175,30 +177,33 @@ PY
 }
 
 run_all() {
-  local appworld=$workspace/ace-appworld
-  [[ -x $appworld/.venv/bin/appworld ]] || fail "Run setup first: $appworld"
-  [[ $(git -C "$appworld" rev-parse HEAD) == "$appworld_commit" ]] || fail "Wrong AppWorld commit"
+  check_checkout
+  bash "$repo_root/scripts/setup_appworld_venv.sh" check
   [[ -n ${OPENAI_API_KEY:-} ]] || fail "Set OPENAI_API_KEY for the configured Qwen3.8-flash endpoint"
   for run in "${runs[@]}"; do
-    [[ ! -e $appworld/experiments/outputs/$run && ! -L $appworld/experiments/outputs/$run ]] || fail "Output already exists: $appworld/experiments/outputs/$run"
-    [[ -f $appworld/experiments/configs/$run.jsonnet ]] || fail "Missing config: $run"
+    [[ ! -e $repo_root/experiments/outputs/$run && ! -L $repo_root/experiments/outputs/$run ]] || fail "Output already exists: $repo_root/experiments/outputs/$run"
   done
-  (cd "$appworld" && git diff --quiet -- src experiments/code experiments/configs data/datasets) || fail "Runner code, configs, or dataset manifests changed"
-  (cd "$appworld" && git diff --cached --quiet -- src experiments/code experiments/configs data/datasets) || fail "Staged runner inputs changed"
-  export APPWORLD_PROJECT_PATH=$appworld
-  (cd "$appworld" && check_inputs "$appworld")
-  clear_reference_playbooks "$appworld"
+  local book
+  for book in "${playbooks[@]}"; do
+    [[ ! -e $workspace/playbooks/$book && ! -L $workspace/playbooks/$book ]] || fail "Playbook already exists: $workspace/playbooks/$book"
+  done
+  export APPWORLD_PROJECT_PATH=$repo_root
+  (cd "$repo_root" && check_inputs)
+  mkdir -p -- "$workspace/playbooks"
+  local override
   for i in "${!runs[@]}"; do
     printf '\n[%d/%d] %s on %s\n' "$((i + 1))" "${#runs[@]}" "${runs[$i]}" "${datasets[$i]}"
-    (cd "$appworld" && .venv/bin/appworld run "${runs[$i]}" --root .)
-    (cd "$appworld" && .venv/bin/appworld evaluate "${runs[$i]}" "${datasets[$i]}" --root .)
-    verify_result "$appworld" "${runs[$i]}" "${datasets[$i]}" "${expected_counts[$i]}"
+    override=$(make_override "$workspace/playbooks/${playbooks[$i]}")
+    (cd "$repo_root" && "$venv/bin/appworld" run "${runs[$i]}" --override "$override" --root .)
+    (cd "$repo_root" && "$venv/bin/appworld" evaluate "${runs[$i]}" "${datasets[$i]}" --root .)
+    verify_result "${runs[$i]}" "${datasets[$i]}" "${expected_counts[$i]}"
   done
-  printf '\nAll 10 ACE runs completed. Outputs: %s/experiments/outputs/\n' "$appworld"
+  printf '\nAll 10 ACE runs completed. Outputs: %s/experiments/outputs/\n' "$repo_root"
 }
 
 case ${1:-} in
   plan) [[ $# == 1 ]] || fail "Unexpected arguments"; print_plan ;;
+  check) [[ $# == 1 ]] || fail "Unexpected arguments"; check_checkout ;;
   setup) [[ $# == 1 ]] || fail "Unexpected arguments"; setup ;;
   run) [[ $# == 1 ]] || fail "Unexpected arguments"; run_all ;;
   all) [[ $# == 1 ]] || fail "Unexpected arguments"; setup; run_all ;;

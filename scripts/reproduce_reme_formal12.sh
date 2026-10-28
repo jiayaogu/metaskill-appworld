@@ -3,26 +3,30 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+# The AppWorld checkout supplies datasets and runner code; ReMe is bundled below.
 source_root="$repo_root/baselines/reme2f37a15"
 assets="$source_root"
+# ReMe's runtime copy, service environment, and provider.env live here.
 workspace=${REME_REPRO_WORKSPACE:-"$repo_root/.repro-reme"}
-appworld_commit=634d67c3bf54a2fb1fa55f4b1200a3ea91b162ce
-appworld_url=https://github.com/jiayaogu/metaskill-appworld.git
+appworld="$repo_root"
+appworld_venv="$repo_root/.venv-appworld"
 
 usage() {
   cat <<'USAGE'
 Usage:
+  bash scripts/reproduce_reme_formal12.sh check
   bash scripts/reproduce_reme_formal12.sh setup
   bash scripts/reproduce_reme_formal12.sh run /absolute/path/to/provider.env
   bash scripts/reproduce_reme_formal12.sh all /absolute/path/to/provider.env
 
-setup clones the pinned AppWorld commit, copies the bundled frozen ReMe source,
-creates separate Python 3.11 environments, and downloads official AppWorld data.
+check verifies required dataset, AppWorld, and bundled ReMe source paths exist.
+setup prepares the shared AppWorld environment, copies the bundled ReMe
+source, and creates its separate Python 3.11 service environment.
 run starts a dedicated local Elasticsearch container (unless REME_ES_URL is set),
 plans 12 cells, and executes 702 primary task attempts with real provider calls.
 Set REME_CAMPAIGN to resume a previously started campaign; otherwise each run gets
-a fresh campaign name. By default, outputs stay under this checkout at
-  .repro-reme/ace-appworld/experiments/outputs/.
+a fresh campaign name. Outputs are written to this checkout at
+  experiments/outputs/.
 
 Optional: REME_CHAT_INPUT_RATE, REME_CHAT_OUTPUT_RATE, REME_CHAT_CACHED_RATE,
 REME_EMBED_INPUT_RATE (USD per million tokens, historical defaults 0.64, 2.16,
@@ -34,76 +38,70 @@ USAGE
 fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || fail "Required command missing: $1"; }
 
-clone_pin() {
-  local url=$1 directory=$2 commit=$3
-  if [[ ! -d "$directory/.git" ]]; then
-    [[ ! -e "$directory" || -z $(ls -A "$directory" 2>/dev/null) ]] || fail "Refusing nonempty directory: $directory"
-    git clone "$url" "$directory"
-  fi
-  if [[ $(git -C "$directory" rev-parse HEAD) != "$commit" ]]; then
-    [[ -z $(git -C "$directory" status --porcelain) ]] || fail "Dirty checkout at $directory; cannot switch commits"
-    git -C "$directory" cat-file -e "$commit^{commit}" 2>/dev/null || git -C "$directory" fetch origin "$commit"
-    git -C "$directory" checkout --detach "$commit"
-  fi
-  [[ $(git -C "$directory" rev-parse HEAD) == "$commit" ]] || fail "Wrong commit at $directory"
+# Check either the bundled ReMe tree or the runtime copy used by the executor.
+check_reme_source() {
+  local root=$1 relative
+  for relative in \
+    pyproject.toml benchmark/appworld/execution_matrix.py \
+    benchmark/appworld/execution_coordinator.py benchmark/appworld/execution_audit.py \
+    benchmark/appworld/execution_accounting.py benchmark/appworld/execution_budget.py \
+    benchmark/appworld/execution_recovery.py benchmark/appworld/execution_scheduler.py \
+    benchmark/appworld/appworld_react_agent.py benchmark/appworld/appworld_reward.py \
+    benchmark/appworld/prompt.py reme/config/service.yaml \
+    docs/library/paper_data/task/appworld_qwen3_8b.jsonl; do
+    [[ -f "$root/$relative" ]] || fail "Missing ReMe source or input: $root/$relative"
+  done
 }
 
-verify_inputs() {
-  python3.11 - "$assets/source-sha256.json" "${1:-$reme}" "$appworld" <<'PY'
-import hashlib, json, sys
-from pathlib import Path
-manifest = json.loads(Path(sys.argv[1]).read_text())
-for key, root in (("reme_source_sha256", Path(sys.argv[2])), ("appworld_sha256", Path(sys.argv[3]))):
-    for relative, expected in manifest[key].items():
-        path = root / relative
-        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-            raise SystemExit(f"Source/data checksum mismatch: {path}")
-print(f"Verified {len(manifest['reme_source_sha256'])} ReMe and {len(manifest['appworld_sha256'])} AppWorld files")
-PY
+# Fail before installation or provider calls if required checkout paths are missing.
+check_sources() {
+  local relative
+  for relative in \
+    pyproject.toml experiments/setup.py src/appworld/task.py \
+    src/appworld/environment.py src/appworld/evaluator.py \
+    experiments/code/common/lm_logger.py scripts/setup_appworld_venv.sh \
+    data/datasets/intermediate_8h_test_normal.txt \
+    data/datasets/intermediate_8h_test_challenge.txt \
+    data/datasets/quick2h_test_normal_v2.txt \
+    data/datasets/quick2h_test_challenge_v2.txt; do
+    [[ -f "$appworld/$relative" ]] || fail "Missing AppWorld source or dataset: $appworld/$relative"
+  done
+  for relative in constraints.txt compose.yaml index-template.json; do
+    [[ -f "$assets/$relative" ]] || fail "Missing ReMe setup asset: $assets/$relative"
+  done
+  check_reme_source "$source_root"
+  printf 'Checkout OK: required AppWorld, ReMe, dataset, and setup asset paths exist.\n'
 }
 
 setup() {
-  need git
-  need python3.11
-  need git-lfs
+  check_sources
+  bash "$repo_root/scripts/setup_appworld_venv.sh" setup
+  # Keep the ReMe service environment separate from the shared AppWorld runner.
   mkdir -p "$workspace"
   workspace=$(cd "$workspace" && pwd -P)
-  appworld="$workspace/ace-appworld"
   reme="$workspace/ReMe-2f37a15"
-  clone_pin "$appworld_url" "$appworld" "$appworld_commit"
-  # The frozen test suite and default CLI lookup expect ../ace/ace-appworld.
-  mkdir -p "$workspace/ace"
-  if [[ -e "$workspace/ace/ace-appworld" || -L "$workspace/ace/ace-appworld" ]]; then
-    [[ -L "$workspace/ace/ace-appworld" && $(readlink "$workspace/ace/ace-appworld") == ../ace-appworld ]] \
-      || fail "Unexpected AppWorld compatibility path: $workspace/ace/ace-appworld"
-  else
-    ln -s ../ace-appworld "$workspace/ace/ace-appworld"
-  fi
-  git -C "$appworld" lfs install --local
-  git -C "$appworld" lfs pull
-  verify_inputs "$source_root"
-  if [[ ! -d "$reme" ]]; then
-    mkdir -p "$reme"
-    cp -a "$source_root/." "$reme/"
-  fi
-  verify_inputs
-  if [[ ! -x "$appworld/.venv/bin/python" ]]; then python3.11 -m venv "$appworld/.venv"; fi
+  # The shared setup has hydrated AppWorld's Git LFS files.
+  check_sources
+  # Refresh the runtime source from this checkout while retaining its service venv.
+  mkdir -p "$reme"
+  cp -a "$source_root/." "$reme/"
+  check_reme_source "$reme"
   if [[ ! -x "$reme/.venv/bin/python" ]]; then python3.11 -m venv "$reme/.venv"; fi
-  "$appworld/.venv/bin/python" -m pip install --upgrade pip setuptools wheel
-  (cd "$appworld" && .venv/bin/python -m pip install -e . -e 'experiments[simplified]' \
-    'ray==2.59.0' 'loguru>=0.7.3' 'pydantic==2.13.5' 'together==1.5.35')
-  (cd "$appworld" && APPWORLD_PROJECT_PATH="$appworld" .venv/bin/appworld install --repo)
-  (cd "$appworld" && APPWORLD_PROJECT_PATH="$appworld" .venv/bin/appworld download data)
   "$reme/.venv/bin/python" -m pip install --upgrade pip setuptools wheel
   "$reme/.venv/bin/python" -m pip install -c "$assets/constraints.txt" -e "$reme[light,ray]" 'sqlalchemy[asyncio]'
-  "$appworld/.venv/bin/python" -m pip check
   "$reme/.venv/bin/python" -m pip check
   "$reme/.venv/bin/python" -c 'from reme.reme import ReMe; from reme.core.service.http_service import HttpService'
-  # Two historical parity tests call `git show 2f37a15`; this vendored source has no ReMe Git history.
-  # The frozen source and its AppWorld inputs have already passed the manifest hash checks above.
-  (cd "$reme" && PYTHONWARNINGS=ignore "$appworld/.venv/bin/python" - <<'PY'
+  # Point offline tests at this checkout. Two parity tests need upstream ReMe Git history.
+  (cd "$reme" && APPWORLD_PROJECT_PATH="$appworld" PYTHONWARNINGS=ignore "$appworld_venv/bin/python" - <<'PY'
+import os
 import sys
 import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path.cwd() / "benchmark/appworld"))
+import execution_matrix
+
+execution_matrix.DEFAULT_APPWORLD_ROOT = Path(os.environ["APPWORLD_PROJECT_PATH"]).resolve()
 
 excluded_names = {
     "test_original_core_ast_is_unchanged",
@@ -123,7 +121,7 @@ def collect(suite):
 collect(unittest.defaultTestLoader.discover("benchmark/appworld", pattern="test_*.py"))
 if len(excluded) != 2:
     raise SystemExit(f"Expected two Git-history parity tests, found {excluded}")
-print(f"Running {len(selected)} ReMe tests; frozen source and input hashes verified", flush=True)
+print(f"Running {len(selected)} ReMe tests against this checkout", flush=True)
 result = unittest.TextTestRunner(verbosity=1).run(unittest.TestSuite(selected))
 sys.exit(0 if result.wasSuccessful() else 1)
 PY
@@ -131,6 +129,8 @@ PY
   printf 'Setup complete: %s\n' "$workspace"
 }
 
+# Build the campaign's immutable cost policy from provider URLs and token rates.
+# Formal accounting records estimated USD with no spending ceiling.
 write_accounting_policy() {
   if [[ -n ${REME_FORMAL_ACCOUNTING_POLICY:-} ]]; then
     [[ -f "$REME_FORMAL_ACCOUNTING_POLICY" ]] || fail "Accounting policy missing: $REME_FORMAL_ACCOUNTING_POLICY"
@@ -177,6 +177,7 @@ data = {
     },
 }
 path = Path(sys.argv[2]); encoded = (json.dumps(data, indent=2, sort_keys=True) + "\n").encode()
+# Resuming a campaign with different rates or endpoints would mix cost evidence.
 if path.exists() and path.read_bytes() != encoded:
     raise SystemExit(f"Accounting policy changed for existing campaign: {path}")
 if not path.exists():
@@ -185,6 +186,8 @@ print(f"Accounting policy: {path}")
 PY
 }
 
+# Start the owned local container, or validate the selected external ES endpoint.
+# The index template keeps embedding vectors in _source for checkpoint recovery.
 prepare_elasticsearch() {
   need curl
   if [[ -z ${REME_ES_URL:-} ]]; then
@@ -196,6 +199,7 @@ prepare_elasticsearch() {
   fi
   curl --fail --silent --show-error "$es_url/_cluster/health?wait_for_status=yellow&timeout=30s" >/dev/null
   local template_url="$es_url/_index_template/reme-formal12-source-vectors"
+  # If the template already exists, verify its required setting before reuse.
   if ! curl --fail --silent --show-error -X PUT "$template_url?create=true" \
       -H 'Content-Type: application/json' --data-binary "@$assets/index-template.json" >/dev/null 2>&1; then
     curl --fail --silent --show-error "$template_url" | "$reme/.venv/bin/python" -c '
@@ -209,19 +213,17 @@ if str(setting).lower() != "false": raise SystemExit("Existing Elasticsearch tem
   fi
 }
 
+# Check all local inputs before preparing services or making model requests.
 run() {
-  need python3.11
-  need git
+  check_sources
+  bash "$repo_root/scripts/setup_appworld_venv.sh" check
   [[ $# == 1 && -f $1 ]] || fail "run needs an existing provider .env file"
   provider_file=$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")
   mkdir -p "$workspace"
   workspace=$(cd "$workspace" && pwd -P)
-  appworld="$workspace/ace-appworld"
   reme="$workspace/ReMe-2f37a15"
-  [[ -x "$appworld/.venv/bin/python" && -x "$reme/.venv/bin/python" ]] || fail "Run setup first"
-  [[ $(git -C "$appworld" rev-parse HEAD) == "$appworld_commit" ]] || fail "AppWorld commit changed"
-  verify_inputs "$source_root"
-  verify_inputs
+  [[ -x "$reme/.venv/bin/python" ]] || fail "Run ReMe setup first"
+  check_reme_source "$reme"
   campaign=${REME_CAMPAIGN:-repro-$(date -u +%Y%m%d-%H%M%S)}
   [[ $campaign =~ ^[a-z0-9][a-z0-9_-]{0,39}$ ]] || fail "Invalid campaign name"
   write_accounting_policy
@@ -230,7 +232,8 @@ run() {
   export APPWORLD_ROOT="$appworld"
   export REME_FORMAL_ACCOUNTING_FILE="$policy"
   export APPWORLD_LM_LOGGER_MODULE_PATH="$appworld/experiments/code/common/lm_logger.py"
-  "$appworld/.venv/bin/python" - <<'PY'
+  # Load every selected task without ground truth before planning any run.
+  "$appworld_venv/bin/python" - <<'PY'
 from appworld import load_task_ids
 from appworld.task import Task
 for dataset in ("intermediate_8h_test_normal", "intermediate_8h_test_challenge", "quick2h_test_normal_v2", "quick2h_test_challenge_v2"):
@@ -239,18 +242,21 @@ for dataset in ("intermediate_8h_test_normal", "intermediate_8h_test_challenge",
         task.close()
 print("All selected AppWorld tasks load successfully")
 PY
+
   local outputs="$appworld/experiments/outputs"
   shopt -s nullglob
   local manifests=("$outputs"/reme_"$campaign"_*_run_0/run_manifest.json)
   shopt -u nullglob
+  # Plan a new campaign once; preserve all twelve manifests on resume.
   if (( ${#manifests[@]} == 0 )); then
-    (cd "$reme" && "$appworld/.venv/bin/python" benchmark/appworld/execution_matrix.py \
+    (cd "$reme" && "$appworld_venv/bin/python" benchmark/appworld/execution_matrix.py \
       --appworld-root "$appworld" --campaign "$campaign" --formal-accounting "$policy")
   elif (( ${#manifests[@]} != 12 )); then
     fail "Campaign $campaign has ${#manifests[@]} manifests; expected 12"
   fi
+  # The coordinator owns run scheduling, task order, recovery, and provider calls.
   printf 'Starting campaign %s; this makes real provider calls.\n' "$campaign"
-  (cd "$reme" && "$appworld/.venv/bin/python" benchmark/appworld/execution_coordinator.py \
+  (cd "$reme" && "$appworld_venv/bin/python" benchmark/appworld/execution_coordinator.py \
     --execute-formal --appworld-root "$appworld" --campaign "$campaign" \
     --env-file "$provider_file" --formal-accounting "$policy" \
     --service-python "$reme/.venv/bin/python" --es-url "$es_url" \
@@ -262,6 +268,7 @@ PY
 }
 
 case ${1:-} in
+  check) [[ $# == 1 ]] || { usage; exit 2; }; check_sources ;;
   setup) [[ $# == 1 ]] || { usage; exit 2; }; setup ;;
   run) [[ $# == 2 ]] || { usage; exit 2; }; run "$2" ;;
   all) [[ $# == 2 ]] || { usage; exit 2; }; setup; run "$2" ;;

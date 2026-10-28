@@ -76,6 +76,7 @@ __pypackages__/
 # Environments
 .env
 .venv/
+.venv-appworld/
 .venv-appworld-only/
 .venv-clean-appworld/
 env/
